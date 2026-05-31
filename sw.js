@@ -1,10 +1,11 @@
 /* Neon Arcade service worker — cache-first offline support */
-const CACHE = 'neon-arcade-v1';
+const CACHE = 'neon-arcade-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './shared/audio.js',
+  './shared/leaderboard.js',
   './vendor/phaser.min.js',
   './vendor/three.module.js',
   './games/drift/index.html',

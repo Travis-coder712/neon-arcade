@@ -31,14 +31,33 @@
   #over { display:none; }
   #over .stat { color:#9fe9ff; font-size:18px; text-shadow:0 0 10px rgba(0,240,255,.7); }
   .back { position:fixed; top:env(safe-area-inset-top,10px); left:10px; z-index:11; color:#ffb3f6; text-decoration:none; font-size:13px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); border-radius:9px; padding:6px 11px; }
-  .mutebtn { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); color:#ffb3f6; }
+  .toprt { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; display:flex; gap:7px; }
+  .iconbtn { width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); color:#ffb3f6; }
+  .iconbtn.off { opacity:.4; }
+  /* leaderboard */
+  .lb { width:100%; max-width:330px; background:rgba(30,8,55,.45); border:1px solid rgba(0,240,255,.3); border-radius:14px; padding:12px 14px; }
+  .lb-title { font-size:12px; letter-spacing:3px; color:#9fe9ff; text-align:center; margin-bottom:8px; text-shadow:0 0 10px rgba(0,240,255,.6); }
+  .lb-row { display:flex; align-items:center; gap:10px; padding:4px 6px; border-radius:7px; font-size:15px; color:#e7d4ff; }
+  .lb-row:nth-child(even) { background:rgba(255,255,255,.03); }
+  .lb-row.lb-hot { background:rgba(0,240,255,.16); color:#fff; }
+  .lb-rank { width:18px; color:#9fe9ff; font-weight:bold; }
+  .lb-name { flex:1; letter-spacing:2px; font-weight:bold; }
+  .lb-val { font-variant-numeric:tabular-nums; color:#ff9bf4; }
+  .lb-empty { text-align:center; color:#c7a8e8; opacity:.7; font-size:13px; padding:6px; }
+  .initrow { display:flex; gap:10px; align-items:center; justify-content:center; margin:2px 0; }
+  .initrow input { width:96px; text-transform:uppercase; text-align:center; letter-spacing:6px; font-size:24px; font-weight:bold; background:rgba(30,8,55,.7); border:2px solid #00f0ff; border-radius:10px; color:#9fe9ff; padding:6px; }
+  .initrow button { padding:9px 18px; border:none; border-radius:24px; font-weight:bold; letter-spacing:1px; background:#00f0ff; color:#16002a; }
 </style>
 <script src="../../shared/audio.js"></script>
+<script src="../../shared/leaderboard.js"></script>
 <script type="importmap">{ "imports": { "three": "../../vendor/three.module.js" } }</script>
 </head>
 <body>
 <a class="back" href="../../index.html">‹ ARCADE</a>
-<button class="mutebtn" id="mute">🔊</button>
+<div class="toprt">
+  <button class="iconbtn" id="musicBtn" title="Music">🎵</button>
+  <button class="iconbtn" id="mute" title="All sound">🔊</button>
+</div>
 
 <div id="hud">
   <div class="panel"><div class="label">SPEED</div><div class="value" id="speed">0</div></div>
@@ -52,11 +71,18 @@
   <div class="sub">★ 3D ENDLESS RACER ★</div>
   <p>Weave through traffic at full speed. Swap lanes with <kbd>◄</kbd> <kbd>►</kbd> (or the <kbd>←</kbd> <kbd>→</kbd> arrows / tap the screen sides). Don't crash — you get faster the longer you survive.</p>
   <button class="play" id="playBtn">DRIVE ▶</button>
+  <div class="lb"><div class="lb-title">🏆 HIGH SCORES 🏆</div><div id="lbTitle"></div></div>
 </div>
 <div class="overlay" id="over">
   <h1>CRASHED</h1>
   <div class="stat" id="finalScore">Score: 0</div>
   <div class="stat" id="finalBest">Best: 0</div>
+  <div class="initrow" id="initRow" style="display:none;">
+    <span style="color:#9fe9ff;font-size:13px;letter-spacing:1px;">TOP&nbsp;5! INITIALS</span>
+    <input id="initInput" maxlength="3" value="YOU" />
+    <button id="saveScore">SAVE</button>
+  </div>
+  <div class="lb"><div class="lb-title">🏆 HIGH SCORES 🏆</div><div id="lbResults"></div></div>
   <button class="play" id="againBtn" style="background:linear-gradient(90deg,#00f0ff,#9bf6ff);box-shadow:0 0 24px rgba(0,240,255,.7);">RETRY ▶</button>
 </div>
 
@@ -96,11 +122,29 @@ function neonStrip(x,w,color){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,1
 neonStrip(-3,0.18,0x00f0ff); neonStrip(3,0.18,0x00f0ff); neonStrip(-ROAD_HALF,0.3,0xff3df0); neonStrip(ROAD_HALF,0.3,0xff3df0);
 
 function buildCar(bodyColor,accent){const car=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.9,4.4),new THREE.MeshStandardMaterial({color:bodyColor,metalness:.7,roughness:.25,emissive:accent,emissiveIntensity:.35}));body.position.y=.7;car.add(body);
-  const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.7,.7,2.0),new THREE.MeshStandardMaterial({color:0x0bd8ff,metalness:.9,roughness:.1,emissive:0x0bd8ff,emissiveIntensity:.4}));cabin.position.set(0,1.35,-.2);car.add(cabin);
-  const wheelGeo=new THREE.CylinderGeometry(.5,.5,.4,14),wheelMat=new THREE.MeshStandardMaterial({color:0x111118,roughness:.8});
-  [[-1.1,-1.5],[1.1,-1.5],[-1.1,1.5],[1.1,1.5]].forEach(([wx,wz])=>{const w=new THREE.Mesh(wheelGeo,wheelMat);w.rotation.z=Math.PI/2;w.position.set(wx,.4,wz);car.add(w);});
-  const glow=new THREE.Mesh(new THREE.PlaneGeometry(2.6,4.8),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.5}));glow.rotation.x=-Math.PI/2;glow.position.y=.06;car.add(glow);
+  const paint=new THREE.MeshStandardMaterial({color:bodyColor,metalness:.85,roughness:.22,emissive:accent,emissiveIntensity:.22});
+  const dark=new THREE.MeshStandardMaterial({color:0x111118,metalness:.6,roughness:.4});
+  // two-tier sports body + sloped nose (front = -z)
+  const chassis=new THREE.Mesh(new THREE.BoxGeometry(2.5,.5,4.6),paint); chassis.position.y=.5; car.add(chassis);
+  const upper=new THREE.Mesh(new THREE.BoxGeometry(2.1,.5,2.8),paint); upper.position.set(0,.95,-.1); car.add(upper);
+  const nose=new THREE.Mesh(new THREE.BoxGeometry(2.3,.4,1.2),paint); nose.position.set(0,.55,-2.1); car.add(nose);
+  // cockpit glass
+  const glass=new THREE.MeshStandardMaterial({color:0x0a1a2a,metalness:.9,roughness:.05,emissive:0x0bd8ff,emissiveIntensity:.25,transparent:true,opacity:.92});
+  const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.7,.55,1.8),glass); cabin.position.set(0,1.35,.1); car.add(cabin);
+  // rear spoiler
+  const wing=new THREE.Mesh(new THREE.BoxGeometry(2.4,.12,.7),dark); wing.position.set(0,1.25,2.2); car.add(wing);
+  [[-1,1.0,2.2],[1,1.0,2.2]].forEach(([x,y,z])=>{const s=new THREE.Mesh(new THREE.BoxGeometry(.12,.4,.12),dark);s.position.set(x,y,z);car.add(s);});
+  // headlights (front) + taillights (rear, red glow)
+  const hl=new THREE.MeshBasicMaterial({color:0xffffff}); [-.8,.8].forEach(x=>{const l=new THREE.Mesh(new THREE.BoxGeometry(.5,.18,.1),hl);l.position.set(x,.6,-2.65);car.add(l);});
+  const tl=new THREE.MeshBasicMaterial({color:0xff2a4a}); [-.9,.9].forEach(x=>{const l=new THREE.Mesh(new THREE.BoxGeometry(.45,.16,.1),tl);l.position.set(x,.75,2.4);car.add(l);});
+  // wheels with bright rims
+  const tyre=new THREE.MeshStandardMaterial({color:0x0a0a0e,roughness:.85});
+  const rim=new THREE.MeshStandardMaterial({color:0xdddddd,metalness:.9,roughness:.3,emissive:accent,emissiveIntensity:.4});
+  [[-1.25,-1.4],[1.25,-1.4],[-1.25,1.5],[1.25,1.5]].forEach(([wx,wz])=>{
+    const w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.45,16),tyre); w.rotation.z=Math.PI/2; w.position.set(wx,.5,wz); car.add(w);
+    const r=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,.47,12),rim); r.rotation.z=Math.PI/2; r.position.set(wx,.5,wz); car.add(r);
+  });
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(2.9,5.2),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.45}));glow.rotation.x=-Math.PI/2;glow.position.y=.05;car.add(glow);
   return car; }
 const player=buildCar(0xff3df0,0xff3df0); player.position.set(0,0,4); scene.add(player);
 
@@ -110,6 +154,33 @@ for(let i=0;i<NUM_TRAFFIC;i++){const c=TRAFFIC_COLORS[i%TRAFFIC_COLORS.length];c
 function resetTraffic(t,z){t.position.set(LANES[(Math.random()*3)|0],0,z);t.userData.passed=false;t.userData.warned=false;}
 
 const pylons=[]; for(let i=0;i<26;i++){const side=i%2===0?-1:1;const p=new THREE.Mesh(new THREE.BoxGeometry(.4,3.4,.4),new THREE.MeshStandardMaterial({color:0x12203a,emissive:0x00f0ff,emissiveIntensity:.8}));p.position.set(side*(ROAD_HALF+1.6),1.7,-((i>>1)*18)-8);scene.add(p);pylons.push(p);}
+
+// ---- stars ----
+(()=>{ const N=240, g=new THREE.BufferGeometry(), pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ pos[i*3]=(Math.random()-0.5)*420; pos[i*3+1]=18+Math.random()*80; pos[i*3+2]=-120-Math.random()*260; }
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:0.9,sizeAttenuation:true,fog:false,transparent:true,opacity:.85}))); })();
+
+// ---- distant mountains (silhouette at the horizon) ----
+for(let i=0;i<6;i++){ const side=i<3?-1:1; const m=new THREE.Mesh(new THREE.ConeGeometry(26+Math.random()*14,30+Math.random()*22,4),
+    new THREE.MeshStandardMaterial({color:0x180a33,emissive:0x3a0f63,emissiveIntensity:.4,flatShading:true}));
+  m.rotation.y=Math.PI/4; m.position.set(side*(40+i%3*34),6,-205-(i%3)*18); scene.add(m); }
+
+// ---- city skyline windows texture ----
+function windowsTex(tint){ const c=document.createElement('canvas');c.width=64;c.height=128;const x=c.getContext('2d');
+  x.fillStyle='#0a0618';x.fillRect(0,0,64,128);
+  for(let yy=6;yy<124;yy+=10) for(let xx=6;xx<58;xx+=10){ if(Math.random()<.5){ x.fillStyle=Math.random()<.5?tint:'#1a1030'; x.fillRect(xx,yy,6,6);} }
+  const t=new THREE.CanvasTexture(c); return t; }
+const winT=['#00f0ff','#ff3df0','#ffe14d'].map(windowsTex);
+
+// ---- scrolling city skyline (recycles) ----
+const buildings=[]; const B_SPACING=20, B_ROWS=16, SIDE_LEN=B_SPACING*B_ROWS;
+for(let row=0;row<B_ROWS;row++){ for(const side of [-1,1]){
+  const h=8+Math.random()*26, w=4+Math.random()*5, d=4+Math.random()*5;
+  const tex=winT[(Math.random()*winT.length)|0];
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color:0x140a28,map:tex,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:.6,roughness:.8}));
+  b.position.set(side*(ROAD_HALF+7+Math.random()*16), h/2, -(row*B_SPACING)-12); scene.add(b); buildings.push(b);
+}}
 
 const state={running:false,speed:0,baseSpeed:55,score:0,best:Number(localStorage.getItem('neonRushBest')||0),targetLane:1,invuln:0};
 document.getElementById('best').textContent=state.best;
@@ -132,6 +203,7 @@ function animate(){ requestAnimationFrame(animate); const dt=Math.min(clock.getD
       if(state.invuln<=0 && Math.abs(t.position.z-player.position.z)<3.6 && Math.abs(t.position.x-player.position.x)<2.1) crash();
     }
     for(const p of pylons){ p.position.z+=move; if(p.position.z>16) p.position.z-=234; }
+    for(const b of buildings){ b.position.z+=move; if(b.position.z>30) b.position.z-=SIDE_LEN; }
     if(state.invuln>0){state.invuln-=dt;player.visible=(Math.floor(clock.elapsedTime*20)%2===0);} else player.visible=true;
     document.getElementById('speed').textContent=Math.round(state.speed*2.4);
     document.getElementById('score').textContent=Math.floor(state.score);
@@ -143,14 +215,25 @@ function animate(){ requestAnimationFrame(animate); const dt=Math.min(clock.getD
 }
 animate();
 
+const LB_KEY='neonRush.leaderboard.v1';
+const scoreFmt=v=>Math.floor(v).toLocaleString();
+function renderLeaderboard(id,hot){ document.getElementById(id).innerHTML=Leaderboard.renderRows(LB_KEY,false,scoreFmt,hot); }
+
 function crash(){ state.running=false; if(window.Sound){Sound.crash();Sound.stopEngine();}
-  if(state.score>state.best){state.best=Math.floor(state.score);localStorage.setItem('neonRushBest',state.best);}
-  document.getElementById('finalScore').textContent='Score: '+Math.floor(state.score);
+  const sc=Math.floor(state.score);
+  if(sc>state.best){state.best=sc;localStorage.setItem('neonRushBest',state.best);}
+  document.getElementById('finalScore').textContent='Score: '+sc;
   document.getElementById('finalBest').textContent='Best: '+state.best;
   document.getElementById('best').textContent=state.best;
+  // leaderboard
+  state._pending=sc;
+  const q=Leaderboard.qualifies(LB_KEY,sc,false);
+  document.getElementById('initRow').style.display=q?'flex':'none';
+  renderLeaderboard('lbResults');
+  if(q){ const inp=document.getElementById('initInput'); inp.value=(localStorage.getItem('neonArcadeName')||'YOU'); setTimeout(()=>{inp.focus();inp.select();},50); }
   document.getElementById('over').style.display='flex'; }
 
-function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();}
+function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();Sound.startMusic(Sound.MUSIC.rush);}
   state.running=true;state.score=0;state.speed=state.baseSpeed;state.targetLane=1;state.invuln=1.2;
   player.position.set(0,0,4);player.visible=true;
   traffic.forEach((t,i)=>resetTraffic(t,-60-i*28));
@@ -164,8 +247,24 @@ document.getElementById('playBtn').addEventListener('click',startGame);
 document.getElementById('againBtn').addEventListener('click',startGame);
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
 
+// leaderboard render + save
+renderLeaderboard('lbTitle');
+document.getElementById('saveScore').addEventListener('click',()=>{
+  if(state._pending==null)return;
+  const name=document.getElementById('initInput').value||'YOU';
+  localStorage.setItem('neonArcadeName',name.toUpperCase().slice(0,3));
+  const board=Leaderboard.add(LB_KEY,name,state._pending,false);
+  const hot=board.find(e=>e.v===state._pending); state._pending=null;
+  document.getElementById('initRow').style.display='none';
+  renderLeaderboard('lbResults',hot&&hot.n); renderLeaderboard('lbTitle');
+  if(window.Sound)Sound.beep(1047);
+});
+
+// sound toggles
 const muteBtn=document.getElementById('mute'); let muted=false;
-muteBtn.addEventListener('click',()=>{muted=!muted;if(window.Sound&&Sound.ctx)Sound.setMuted(muted);muteBtn.textContent=muted?'🔇':'🔊';});
+muteBtn.addEventListener('click',()=>{muted=!muted;if(window.Sound&&Sound.ctx)Sound.setMuted(muted);muteBtn.textContent=muted?'🔇':'🔊';muteBtn.classList.toggle('off',muted);});
+const musicBtn=document.getElementById('musicBtn'); let musicOff=false;
+musicBtn.addEventListener('click',()=>{musicOff=!musicOff;if(window.Sound&&Sound.ctx)Sound.setMusicMuted(musicOff);musicBtn.classList.toggle('off',musicOff);});
 window.__g={state,traffic,player,LANES,shift};
 </script>
 </body>

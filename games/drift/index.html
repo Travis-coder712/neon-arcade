@@ -9,6 +9,7 @@
 <title>Neon Drift</title>
 <script src="../../vendor/phaser.min.js"></script>
 <script src="../../shared/audio.js"></script>
+<script src="../../shared/leaderboard.js"></script>
 <style>
   :root { --mint:#2bff9e; --orange:#ff8a3d; --amber:#ffd23d; }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -56,14 +57,41 @@
   #results { display:none; }
   #results .row { font-size:18px; color:#cdeee2; margin:2px 0; text-shadow:0 0 8px rgba(43,255,158,.4); }
   #results .hl { color:var(--amber); font-weight:bold; text-shadow:0 0 12px rgba(255,210,61,.7); }
-  .mutebtn { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; width:36px; height:36px; border-radius:9px; font-size:16px;
-             background:rgba(4,26,28,.5); border:1px solid rgba(43,255,158,.35); color:#9bffd6; }
+  .toprt { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; display:flex; gap:7px; }
+  .iconbtn { width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(4,26,28,.5); border:1px solid rgba(43,255,158,.35); color:#9bffd6; }
+  .iconbtn.off { opacity:.4; }
+
+  /* car selector */
+  .carsel { display:flex; gap:12px; justify-content:center; margin:4px 0 2px; }
+  .swatch { width:44px; height:44px; border-radius:12px; border:2px solid rgba(255,255,255,.15); cursor:pointer; position:relative; transition:transform .1s; }
+  .swatch:active { transform:scale(.92); }
+  .swatch.sel { border-color:#fff; box-shadow:0 0 14px currentColor; transform:scale(1.08); }
+  .carsel-label { font-size:11px; letter-spacing:2px; color:#7fdcc0; opacity:.8; }
+
+  /* leaderboard */
+  .lb { width:100%; max-width:330px; background:rgba(4,26,28,.45); border:1px solid rgba(255,210,61,.3); border-radius:14px; padding:12px 14px; }
+  .lb-title { font-size:12px; letter-spacing:3px; color:var(--amber); text-align:center; margin-bottom:8px; text-shadow:0 0 10px rgba(255,210,61,.6); }
+  .lb-row { display:flex; align-items:center; gap:10px; padding:4px 6px; border-radius:7px; font-size:15px; color:#d8f5ea; }
+  .lb-row:nth-child(even) { background:rgba(255,255,255,.03); }
+  .lb-row.lb-hot { background:rgba(255,210,61,.16); color:#fff; }
+  .lb-rank { width:18px; color:var(--amber); font-weight:bold; }
+  .lb-name { flex:1; letter-spacing:2px; font-weight:bold; }
+  .lb-val { font-variant-numeric:tabular-nums; color:#9bffd6; }
+  .lb-empty { text-align:center; color:#7fdcc0; opacity:.7; font-size:13px; padding:6px; }
+  .initrow { display:flex; gap:10px; align-items:center; justify-content:center; margin:4px 0; }
+  .initrow input { width:96px; text-transform:uppercase; text-align:center; letter-spacing:6px; font-size:24px; font-weight:bold;
+                   background:rgba(4,26,28,.7); border:2px solid var(--amber); border-radius:10px; color:var(--amber); padding:6px; }
+  .initrow button { padding:9px 18px; border:none; border-radius:24px; font-weight:bold; letter-spacing:1px; background:var(--amber); color:#04141a; }
+  .secbtn { margin-top:4px; padding:9px 22px; border:1px solid rgba(43,255,158,.5); background:rgba(43,255,158,.08); color:#9bffd6; border-radius:24px; letter-spacing:2px; font-size:13px; }
 </style>
 </head>
 <body>
 <div id="game"></div>
 <a class="back" href="../../index.html">‹ ARCADE</a>
-<button class="mutebtn" id="mute">🔊</button>
+<div class="toprt">
+  <button class="iconbtn" id="musicBtn" title="Music">🎵</button>
+  <button class="iconbtn" id="mute" title="All sound">🔊</button>
+</div>
 
 <div id="hud">
   <div class="panel"><div class="label">SPEED</div><div class="value" id="speed">0</div></div>
@@ -86,7 +114,13 @@
   <h1>NEON DRIFT</h1>
   <div class="sub">★ 3-LAP RACE ★</div>
   <p>Auto-accelerate. Steer <kbd>◄</kbd> <kbd>►</kbd> and <b style="color:var(--orange)">hold DRIFT</b> (the orange button, or <kbd>Space</kbd> on a keyboard) to slide through corners. Beat the AI and chase the <b style="color:var(--amber)">track record</b>.</p>
+  <div class="carsel-label">CHOOSE YOUR CAR</div>
+  <div class="carsel" id="carsel"></div>
   <button class="play" id="playBtn">START ▶</button>
+  <div class="lb">
+    <div class="lb-title">🏁 BEST LAPS 🏁</div>
+    <div id="lbTitle"></div>
+  </div>
 </div>
 
 <div class="overlay" id="results">
@@ -95,6 +129,15 @@
   <div class="row">Total time <span class="hl" id="rTotal">0.00</span></div>
   <div class="row">Best lap <span class="hl" id="rBest">0.00</span></div>
   <div class="row" id="rRecord" style="display:none;color:var(--amber);">★ NEW TRACK RECORD! ★</div>
+  <div class="initrow" id="initRow" style="display:none;">
+    <span style="color:var(--amber);font-size:13px;letter-spacing:1px;">TOP&nbsp;5! INITIALS</span>
+    <input id="initInput" maxlength="3" value="YOU" />
+    <button id="saveScore">SAVE</button>
+  </div>
+  <div class="lb">
+    <div class="lb-title">🏁 BEST LAPS 🏁</div>
+    <div id="lbResults"></div>
+  </div>
   <button class="play" id="againBtn" style="background:linear-gradient(90deg,var(--orange),#ffc89b);box-shadow:0 0 24px rgba(255,138,61,.7);">RACE AGAIN ▶</button>
 </div>
 
@@ -103,6 +146,17 @@ const WORLD_W = 1700, WORLD_H = 1300;
 const ROAD_W = 170, HALF_ROAD = ROAD_W / 2;
 const TOTAL_LAPS = 3;
 const REC_KEY = 'neonDrift.record.v2';
+const LB_KEY = 'neonDrift.leaderboard.v1';
+const SKIN_KEY = 'neonDrift.skin';
+// selectable car skins (player picks one; AI use the rest)
+const SKINS = [
+  { id:'orange', name:'BLAZE',  body:0xff8a3d, hi:0xffc98a, accent:0xffd23d, glass:0x0bd8ff, css:'#ff8a3d' },
+  { id:'cyan',   name:'BOLT',   body:0x19e0ff, hi:0x9af3ff, accent:0xffffff, glass:0x06303f, css:'#19e0ff' },
+  { id:'pink',   name:'FLUX',   body:0xff3df0, hi:0xffa6f7, accent:0xffd23d, glass:0x0bd8ff, css:'#ff3df0' },
+  { id:'lime',   name:'VENOM',  body:0xb6ff3d, hi:0xe0ffac, accent:0x19e0ff, glass:0x06303f, css:'#b6ff3d' }
+];
+let selectedSkin = Math.max(0, SKINS.findIndex(s => s.id === localStorage.getItem(SKIN_KEY)));
+if (selectedSkin < 0) selectedSkin = 0;
 
 const TRACK_PTS = [
   520,300, 920,250, 1270,340, 1430,600, 1330,880,
@@ -148,17 +202,18 @@ class Race extends Phaser.Scene {
 
     // AI cars
     this.ais = [];
-    const aiCfg = [ {tint:0x19e0ff, lapT:9.6, off:34}, {tint:0xff3df0, lapT:11.4, off:-30}, {tint:0xb6ff3d, lapT:10.4, off:8} ];
+    const aiCfg = [ {lapT:9.6, off:34}, {lapT:11.4, off:-30}, {lapT:10.4, off:8} ];
     aiCfg.forEach((c,i)=>{
-      const s = this.add.image(0,0,'aicar').setDepth(4).setTint(c.tint);
+      const s = this.add.image(0,0,'car_cyan').setDepth(4);
       s.prog = -22 - i*16; s.lapT = c.lapT; s.off = c.off; s.laps = 0; s.weave = i*1.3;
       this.ais.push(s);
     });
 
     // player
-    this.car = this.add.image(this.center[0].x, this.center[0].y, 'car').setDepth(5);
+    this.car = this.add.image(this.center[0].x, this.center[0].y, 'car_'+SKINS[selectedSkin].id).setDepth(5);
     this.car.heading = this.angleAt(0);
     this.vx = 0; this.vy = 0;
+    this.applySkins();
 
     this.cameras.main.startFollow(this.car, true, 0.12, 0.12);
     this.setZoom(); this.scale.on('resize', ()=>this.setZoom());
@@ -167,6 +222,13 @@ class Race extends Phaser.Scene {
     if (this.record) document.getElementById('bestv').textContent = (this.record/1000).toFixed(2);
 
     this.resetState();
+  }
+
+  // player gets the chosen skin; AI get the remaining skins
+  applySkins() {
+    this.car.setTexture('car_'+SKINS[selectedSkin].id);
+    const others = SKINS.filter((_,i)=>i!==selectedSkin);
+    this.ais.forEach((s,i)=>s.setTexture('car_'+others[i % others.length].id));
   }
 
   resetState() {
@@ -193,24 +255,46 @@ class Race extends Phaser.Scene {
     g = this.make.graphics({x:0,y:0,add:false});
     g.fillStyle(0xffffff,0.5); g.fillRoundedRect(0,0,9,20,4); g.generateTexture('skidmark',9,20); g.destroy();
 
-    // player car — orange with amber accents (tropical-circuit palette)
-    g = this.make.graphics({x:0,y:0,add:false});
-    const W=54,H=30;
-    g.fillStyle(0xff8a3d,0.18); g.fillRoundedRect(-3,-3,W+6,H+6,12);
-    g.fillStyle(0x231408,1); g.fillRoundedRect(0,0,W,H,9);
-    g.lineStyle(2.5,0xff8a3d,1); g.strokeRoundedRect(1,1,W-2,H-2,9);
-    g.fillStyle(0xffd23d,0.95); g.fillRoundedRect(W*0.34,5,W*0.26,H-10,4);
-    g.fillStyle(0x2bff9e,1); g.fillRoundedRect(W-9,7,6,H-14,3);
-    g.fillStyle(0xffd23d,0.9); g.fillRect(-2,3,5,H-6);
-    g.generateTexture('car',W,H); g.destroy();
+    // soft radial glow texture (for ambient background depth)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const cg = cv.getContext('2d');
+    const grd = cg.createRadialGradient(64,64,0,64,64,64);
+    grd.addColorStop(0,'rgba(255,255,255,1)'); grd.addColorStop(1,'rgba(255,255,255,0)');
+    cg.fillStyle = grd; cg.fillRect(0,0,128,128);
+    if (this.textures.exists('glow')) this.textures.remove('glow');
+    this.textures.addCanvas('glow', cv);
 
-    // generic AI car (white so tint recolors cleanly)
-    g = this.make.graphics({x:0,y:0,add:false});
-    g.fillStyle(0xffffff,0.16); g.fillRoundedRect(-3,-3,W+6,H+6,12);
-    g.fillStyle(0xffffff,1); g.fillRoundedRect(0,0,W,H,9);
-    g.fillStyle(0x0a0a14,1); g.fillRoundedRect(W*0.32,5,W*0.3,H-10,4);
-    g.fillStyle(0x0a0a14,0.6); g.fillRect(-2,3,5,H-6);
-    g.generateTexture('aicar',W,H); g.destroy();
+    // detailed top-down car, one texture per skin (front faces +x)
+    SKINS.forEach(sk => this.drawCar('car_'+sk.id, sk));
+  }
+
+  drawCar(key, sk) {
+    const W=62, H=34;
+    const g = this.make.graphics({x:0,y:0,add:false});
+    // neon ground glow
+    g.fillStyle(sk.body, 0.16); g.fillRoundedRect(-4,-4,W+8,H+8,14);
+    // tyres poking out at the 4 corners
+    g.fillStyle(0x0a0a0e,1);
+    g.fillRoundedRect(9,-3,13,7,3); g.fillRoundedRect(9,H-4,13,7,3);
+    g.fillRoundedRect(W-23,-3,13,7,3); g.fillRoundedRect(W-23,H-4,13,7,3);
+    // body
+    g.fillStyle(sk.body,1); g.fillRoundedRect(3,3,W-6,H-6,11);
+    // hood highlight (front half lighter)
+    g.fillStyle(sk.hi,0.55); g.fillRoundedRect(W*0.5,5,W*0.45,H-10,8);
+    // dark cabin roof
+    g.fillStyle(0x0a0a14,0.5); g.fillRoundedRect(W*0.30,6,W*0.30,H-12,6);
+    // windshield + rear window
+    g.fillStyle(sk.glass,0.95); g.fillRoundedRect(W*0.50,7,W*0.10,H-14,3);
+    g.fillStyle(sk.glass,0.6);  g.fillRoundedRect(W*0.30,7,W*0.07,H-14,3);
+    // centre racing stripe
+    g.fillStyle(sk.accent,0.9); g.fillRect(5,H/2-3,W-12,6);
+    // headlights (front = right)
+    g.fillStyle(0xfff6c8,1); g.fillRoundedRect(W-6,6,4,6,1); g.fillRoundedRect(W-6,H-12,4,6,1);
+    // taillights (rear = left)
+    g.fillStyle(0xff2a2a,1); g.fillRoundedRect(4,6,3,6,1); g.fillRoundedRect(4,H-12,3,6,1);
+    // outline
+    g.lineStyle(2,sk.accent,0.9); g.strokeRoundedRect(3,3,W-6,H-6,11);
+    g.generateTexture(key,W,H); g.destroy();
   }
 
   angleAt(i) {
@@ -291,12 +375,17 @@ class Race extends Phaser.Scene {
     // grandstand rows of crowd lights along a straight
     const gs=this.add.graphics().setDepth(0);
     for (let r=0;r<3;r++){ for(let c=0;c<22;c++){ const col=[0xff8a3d,0x2bff9e,0x19e0ff,0xffd23d][(c+r)%4]; gs.fillStyle(col,0.55); gs.fillRect(560+c*16, 140+r*10, 9,7); } }
+
+    // ambient corner glows for depth
+    [[150,150,0x2bff9e],[WORLD_W-150,200,0xff8a3d],[120,WORLD_H-150,0x19e0ff],[WORLD_W-180,WORLD_H-160,0xff3df0]]
+      .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(11).setTint(c).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(0); });
   }
 
   // ---- countdown then go ----
   beginRace() {
+    this.applySkins();
     this.resetState();
-    Sound.init(); Sound.startEngine(); Sound.setEngine(0.15);
+    Sound.init(); Sound.startEngine(); Sound.setEngine(0.15); Sound.startMusic(Sound.MUSIC.drift);
     const el=document.getElementById('count'), span=el.querySelector('span');
     el.style.display='flex';
     const seq=['3','2','1','GO!'];
@@ -350,6 +439,14 @@ class Race extends Phaser.Scene {
     document.getElementById('rRecord').style.display = this.newRecord ? 'block' : 'none';
     document.getElementById('resultTitle').textContent = pos===1 ? 'YOU WIN!' : 'FINISH';
     document.getElementById('resultTitle').style.color = pos===1 ? 'var(--amber)' : 'var(--mint)';
+
+    // leaderboard: best lap of this race
+    this._pendingLap = this.bestLap;
+    const qualifies = Leaderboard.qualifies(LB_KEY, this.bestLap, true);
+    document.getElementById('initRow').style.display = qualifies ? 'flex' : 'none';
+    renderLeaderboard('lbResults');
+    if (qualifies) { const inp=document.getElementById('initInput'); inp.value = (localStorage.getItem('neonArcadeName')||'YOU'); setTimeout(()=>{inp.focus();inp.select();},50); }
+
     document.getElementById('results').style.display='flex';
     if (pos===1) Sound.record();
   }
@@ -467,8 +564,43 @@ function startGame(){ document.getElementById('title').style.display='none'; doc
 document.getElementById('playBtn').addEventListener('click', startGame);
 document.getElementById('againBtn').addEventListener('click', startGame);
 
+// ---- leaderboard rendering + initials save ----
+const lapFmt = v => (v/1000).toFixed(2)+'s';
+function renderLeaderboard(targetId, hot){ document.getElementById(targetId).innerHTML = Leaderboard.renderRows(LB_KEY, true, lapFmt, hot); }
+renderLeaderboard('lbTitle');
+document.getElementById('saveScore').addEventListener('click', ()=>{
+  const sc=game.scene.scenes[0]; if(sc._pendingLap==null) return;
+  const name=document.getElementById('initInput').value || 'YOU';
+  localStorage.setItem('neonArcadeName', name.toUpperCase().slice(0,3));
+  const board=Leaderboard.add(LB_KEY, name, sc._pendingLap, true);
+  sc._pendingLap=null;
+  document.getElementById('initRow').style.display='none';
+  const hot=board.find(e=>e.v===sc.bestLap); renderLeaderboard('lbResults', hot&&hot.n);
+  renderLeaderboard('lbTitle');
+  Sound.beep(1047);
+});
+
+// ---- car selector ----
+function buildCarSelector(){
+  const wrap=document.getElementById('carsel'); wrap.innerHTML='';
+  SKINS.forEach((sk,i)=>{
+    const el=document.createElement('div'); el.className='swatch'+(i===selectedSkin?' sel':'');
+    el.style.background=sk.css; el.style.color=sk.css; el.title=sk.name;
+    el.addEventListener('click',()=>{ selectedSkin=i; localStorage.setItem(SKIN_KEY, sk.id);
+      [...wrap.children].forEach((c,j)=>c.classList.toggle('sel', j===i));
+      const sc=game.scene&&game.scene.scenes[0]; if(sc&&sc.applySkins) sc.applySkins();
+      if(window.Sound&&Sound.ctx) Sound.beep(660);
+    });
+    wrap.appendChild(el);
+  });
+}
+buildCarSelector();
+
+// ---- sound toggles ----
 const muteBtn=document.getElementById('mute'); let muted=false;
-muteBtn.addEventListener('click',()=>{ muted=!muted; if(window.Sound&&Sound.ctx)Sound.setMuted(muted); muteBtn.textContent=muted?'🔇':'🔊'; });
+muteBtn.addEventListener('click',()=>{ muted=!muted; if(window.Sound&&Sound.ctx)Sound.setMuted(muted); muteBtn.textContent=muted?'🔇':'🔊'; muteBtn.classList.toggle('off',muted); });
+const musicBtn=document.getElementById('musicBtn'); let musicOff=false;
+musicBtn.addEventListener('click',()=>{ musicOff=!musicOff; if(window.Sound&&Sound.ctx)Sound.setMusicMuted(musicOff); musicBtn.textContent=musicOff?'🎵':'🎵'; musicBtn.classList.toggle('off',musicOff); });
 </script>
 </body>
 </html>
