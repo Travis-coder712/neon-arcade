@@ -193,15 +193,25 @@ if (selectedSkin < 0) selectedSkin = 0;
 // Centripetal Catmull-Rom smooths these control points into clean racing lines.
 const TRACKS = [
   { name:'ITALY', flag:'🇮🇹', tag:'Monza — the Temple of Speed: long flat-out straights into legendary chicanes.', ai:11.2,
-    pts:[1180,1020, 1210,720, 1180,430, 1050,300, 860,330, 760,470, 600,470, 470,600, 590,720, 470,920, 720,1040, 980,1050] },
+    pts:[1180,1020, 1210,720, 1180,430, 1050,300, 860,330, 760,470, 600,470, 470,600, 590,720, 470,920, 720,1040, 980,1050],
+    theme:{ edgeA:0xff2d4b, edgeB:0x2bff9e, line:0xffffff, lightA:0xff2d4b, lightB:0x2bff9e, skidA:0xff2d4b, skidB:0xffffff,
+            groundA:'#19090e', groundB:'#0a0507', speckle:'255,45,75', glows:[0xff2d4b,0x2bff9e,0xffffff,0xff2d4b] } },
   { name:'AUSTRALIA', flag:'🇦🇺', tag:'Albert Park — fast, flowing parkland sweepers around the lake.', ai:10.6,
-    pts:[1180,820, 1280,560, 1160,360, 920,310, 680,360, 470,520, 360,730, 500,940, 770,1030, 1030,950] },
+    pts:[1180,820, 1280,560, 1160,360, 920,310, 680,360, 470,520, 360,730, 500,940, 770,1030, 1030,950],
+    theme:{ edgeA:0x2bff9e, edgeB:0xffd23d, line:0xffd23d, lightA:0x2bff9e, lightB:0xffd23d, skidA:0x2bff9e, skidB:0xffd23d,
+            groundA:'#08160f', groundB:'#041009', speckle:'43,255,158', glows:[0x2bff9e,0xffd23d,0x2bff9e,0xffd23d] } },
   { name:'GERMANY', flag:'🇩🇪', tag:'Hockenheim — a blast through the forest into the stadium hairpin.', ai:9.9,
-    pts:[1150,980, 1330,700, 1230,440, 1000,350, 760,400, 560,340, 360,470, 330,690, 540,770, 380,910, 660,970, 940,1050, 1080,1010] },
+    pts:[1150,980, 1330,700, 1230,440, 1000,350, 760,400, 560,340, 360,470, 330,690, 540,770, 380,910, 660,970, 940,1050, 1080,1010],
+    theme:{ edgeA:0xff3b3b, edgeB:0xffd23d, line:0xdfe7ff, lightA:0xff3b3b, lightB:0xffd23d, skidA:0xff3b3b, skidB:0xdfe7ff,
+            groundA:'#150f08', groundB:'#0a0705', speckle:'255,210,61', glows:[0xff3b3b,0xffd23d,0xdfe7ff,0xff3b3b] } },
   { name:'SINGAPORE', flag:'🇸🇬', tag:'Marina Bay by night — ninety-degree walls under the neon lights.', ai:9.2,
-    pts:[1160,1000, 1200,720, 1330,690, 1300,470, 1090,450, 1070,330, 820,350, 800,540, 600,540, 580,350, 380,430, 350,700, 470,780, 380,950, 700,990, 980,1030] },
+    pts:[1160,1000, 1200,720, 1330,690, 1300,470, 1090,450, 1070,330, 820,350, 800,540, 600,540, 580,350, 380,430, 350,700, 470,780, 380,950, 700,990, 980,1030],
+    theme:{ edgeA:0x19e0ff, edgeB:0xff3df0, line:0xffd23d, lightA:0x19e0ff, lightB:0xff3df0, skidA:0x19e0ff, skidB:0xff3df0,
+            groundA:'#0a0a24', groundB:'#06061a', speckle:'25,224,255', glows:[0x19e0ff,0xff3df0,0xffd23d,0x19e0ff] } },
   { name:'MONACO', flag:'🇲🇨', tag:'Jewel of the calendar — barriers inches away, hairpin down to the harbour.', ai:8.5,
-    pts:[980,1010, 1090,820, 980,690, 1080,560, 1030,410, 850,350, 690,420, 560,360, 450,500, 560,650, 410,720, 480,890, 700,930, 600,1050, 860,1030] }
+    pts:[980,1010, 1090,820, 980,690, 1080,560, 1030,410, 850,350, 690,420, 560,360, 450,500, 560,650, 410,720, 480,890, 700,930, 600,1050, 860,1030],
+    theme:{ edgeA:0x2da8ff, edgeB:0xff2d4b, line:0xffffff, lightA:0x2da8ff, lightB:0xff2d4b, skidA:0x2da8ff, skidB:0xffffff,
+            groundA:'#06121f', groundB:'#040a16', speckle:'45,168,255', glows:[0x2da8ff,0xff2d4b,0xffffff,0x2da8ff] } }
 ];
 // game/session state (survives scene.restart)
 const GAME = { mode:'ta', track:0, circuitStep:0 };  // mode: 'ta' (time attack) | 'circuit'
@@ -275,6 +285,7 @@ class Race extends Phaser.Scene {
 
   // build centerline + signed curvature for the active track
   buildTrackData(ti) {
+    this.theme = TRACKS[ti].theme;
     const src = TRACKS[ti].pts, pts = [];
     for (let i=0;i<src.length;i+=2) pts.push(new Phaser.Math.Vector2(src[i], src[i+1]));
     this.center = catmullClosed(pts, 34);
@@ -339,24 +350,23 @@ class Race extends Phaser.Scene {
     if (this.textures.exists('glow')) this.textures.remove('glow');
     this.textures.addCanvas('glow', cv);
 
-    // textured ground (subtle tarmac/tech — replaces the harsh bright grid)
+    // detailed top-down car, one texture per skin (front faces +x)
+    SKINS.forEach(sk => this.drawCar('car_'+sk.id, sk));
+  }
+
+  // per-circuit themed ground texture (regenerated on each track)
+  makeGround() {
+    const th = this.theme;
     const gv = document.createElement('canvas'); gv.width = gv.height = 512; const gx = gv.getContext('2d');
     const bgGrad = gx.createLinearGradient(0,0,512,512);
-    bgGrad.addColorStop(0,'#071a20'); bgGrad.addColorStop(1,'#04101a');
+    bgGrad.addColorStop(0, th.groundA); bgGrad.addColorStop(1, th.groundB);
     gx.fillStyle = bgGrad; gx.fillRect(0,0,512,512);
-    // fine speckle
-    for (let i=0;i<2600;i++){ const a=Math.random()*0.04; gx.fillStyle='rgba(43,255,158,'+a+')'; gx.fillRect(Math.random()*512, Math.random()*512, 2, 2); }
-    // faint coarse grid
-    gx.strokeStyle='rgba(43,255,158,0.045)'; gx.lineWidth=1;
+    for (let i=0;i<2600;i++){ const a=Math.random()*0.045; gx.fillStyle='rgba('+th.speckle+','+a+')'; gx.fillRect(Math.random()*512, Math.random()*512, 2, 2); }
+    gx.strokeStyle='rgba('+th.speckle+',0.05)'; gx.lineWidth=1;
     for (let i=0;i<=512;i+=64){ gx.beginPath();gx.moveTo(i,0);gx.lineTo(i,512);gx.stroke(); gx.beginPath();gx.moveTo(0,i);gx.lineTo(512,i);gx.stroke(); }
-    // a few subtle hex/tech accents
-    gx.strokeStyle='rgba(25,224,255,0.05)';
     for (let i=0;i<8;i++){ const x=Math.random()*512,y=Math.random()*512,r=20+Math.random()*40; gx.beginPath(); gx.arc(x,y,r,0,Math.PI*2); gx.stroke(); }
     if (this.textures.exists('ground')) this.textures.remove('ground');
     this.textures.addCanvas('ground', gv);
-
-    // detailed top-down car, one texture per skin (front faces +x)
-    SKINS.forEach(sk => this.drawCar('car_'+sk.id, sk));
   }
 
   drawCar(key, sk) {
@@ -401,19 +411,21 @@ class Race extends Phaser.Scene {
   }
 
   drawWorld() {
-    this.add.graphics().setDepth(-2).fillStyle(0x04101a,1).fillRect(-400,-400,WORLD_W+800,WORLD_H+800);
+    const th=this.theme;
+    this.makeGround();
+    this.add.graphics().setDepth(-2).fillStyle(Phaser.Display.Color.HexStringToColor(th.groundB).color,1).fillRect(-400,-400,WORLD_W+800,WORLD_H+800);
     this.add.tileSprite(WORLD_W/2, WORLD_H/2, WORLD_W+800, WORLD_H+800, 'ground').setDepth(-1);
 
     const path=this.center, road=this.add.graphics().setDepth(0);
     const loop=(w,c,a)=>{ road.lineStyle(w,c,a); road.beginPath(); road.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) road.lineTo(path[i].x,path[i].y); road.strokePath(); };
-    loop(ROAD_W+26,0xff8a3d,0.10);
-    loop(ROAD_W+14,0x2bff9e,0.16);
-    loop(ROAD_W+6, 0xff8a3d,0.55);
-    loop(ROAD_W,   0x2bff9e,0.6);
-    loop(ROAD_W-7, 0x0a1a1f,1);
-    loop(ROAD_W-9, 0x07151a,1);
+    loop(ROAD_W+26,th.edgeA,0.10);
+    loop(ROAD_W+14,th.edgeB,0.16);
+    loop(ROAD_W+6, th.edgeA,0.55);
+    loop(ROAD_W,   th.edgeB,0.6);
+    loop(ROAD_W-7, 0x0a1118,1);
+    loop(ROAD_W-9, 0x070d12,1);
     // continuous racing line (now seamless around the whole loop incl. finish)
-    road.lineStyle(3,0xffd23d,0.5);
+    road.lineStyle(3,th.line,0.5);
     for (let i=0;i<path.length-4;i+=8){ road.beginPath(); road.moveTo(path[i].x,path[i].y); road.lineTo(path[i+3].x,path[i+3].y); road.strokePath(); }
 
     // start/finish checker
@@ -424,20 +436,21 @@ class Race extends Phaser.Scene {
 
   // decorative neon scenery scattered OUTSIDE the track on the grass
   drawScenery() {
-    const path = this.center, N = this.N;
+    const path = this.center, N = this.N, th = this.theme;
+    const hex = c => '#'+c.toString(16).padStart(6,'0');
 
-    // infield emblem (inside the loop) — big faint concentric rings + wordmark
+    // infield emblem — country name + faint concentric rings, in the circuit's colours
     let ix=0, iy=0; for (let i=0;i<N;i++){ ix+=path[i].x; iy+=path[i].y; } ix/=N; iy/=N;
     const em = this.add.graphics().setDepth(-1);
-    [220,170,120].forEach((r,k)=>{ em.lineStyle(2, [0x2bff9e,0x19e0ff,0xff8a3d][k], 0.10); em.strokeCircle(ix,iy,r); });
-    const wm = this.add.text(ix, iy, 'NEON\nDRIFT', {fontFamily:'Trebuchet MS',fontSize:'58px',fontStyle:'bold italic',color:'#2bff9e',align:'center'}).setOrigin(0.5).setDepth(-1).setAlpha(0.10);
-    wm.setLineSpacing(-8);
+    [220,170,120].forEach((r,k)=>{ em.lineStyle(2, [th.edgeA,th.edgeB,th.line][k], 0.10); em.strokeCircle(ix,iy,r); });
+    const wm = this.add.text(ix, iy, TRACKS[GAME.track].flag+'\n'+TRACKS[GAME.track].name, {fontFamily:'Trebuchet MS',fontSize:'46px',fontStyle:'bold italic',color:hex(th.edgeB),align:'center'}).setOrigin(0.5).setDepth(-1).setAlpha(0.12);
+    wm.setLineSpacing(4);
 
     // track-side running lights: glowing posts just off both edges, all the way round
     const lights = this.add.graphics().setDepth(0);
     for (let i=0; i<N; i+=11) {
       const a = this.angleAt(i), nx = Math.cos(a+Math.PI/2), ny = Math.sin(a+Math.PI/2);
-      const col = (i % 22 === 0) ? 0xff8a3d : 0x2bff9e;
+      const col = (i % 22 === 0) ? th.lightA : th.lightB;
       for (const sgn of [1,-1]) {
         const x = path[i].x + nx*(HALF_ROAD+18)*sgn, y = path[i].y + ny*(HALF_ROAD+18)*sgn;
         lights.fillStyle(col, 0.9); lights.fillCircle(x, y, 3.2);
@@ -461,9 +474,10 @@ class Race extends Phaser.Scene {
       box.lineStyle(3,c,0.4); box.lineBetween(s[0]-14,s[1]+18,s[0]-14,s[1]+44); box.lineBetween(s[0]+14,s[1]+18,s[0]+14,s[1]+44);
     });
 
-    // ambient corner glows for depth
-    [[150,150,0x2bff9e],[WORLD_W-150,200,0xff8a3d],[120,WORLD_H-150,0x19e0ff],[WORLD_W-180,WORLD_H-160,0xff3df0]]
-      .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(12).setTint(c).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1); });
+    // ambient corner glows for depth (circuit's palette)
+    const gp=th.glows;
+    [[150,150,gp[0]],[WORLD_W-150,200,gp[1]],[120,WORLD_H-150,gp[2]],[WORLD_W-180,WORLD_H-160,gp[3]]]
+      .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(12).setTint(c).setAlpha(0.17).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1); });
   }
 
   // ---- track intro splash, then countdown, then go ----
@@ -473,9 +487,12 @@ class Race extends Phaser.Scene {
     Sound.init(); Sound.startEngine(); Sound.setEngine(0.12); Sound.startTrack('../../vendor/music/drift-running.mp3', 0.7, Sound.MUSIC.drift);
 
     const tk = TRACKS[GAME.track];
+    const tcol = '#'+tk.theme.edgeB.toString(16).padStart(6,'0');
     const intro = document.getElementById('intro');
     document.getElementById('introFlag').textContent = tk.flag;
-    document.getElementById('introName').textContent = (GAME.mode==='circuit' ? 'ROUND '+(GAME.track+1)+' · ' : '') + tk.name;
+    const inm = document.getElementById('introName');
+    inm.textContent = (GAME.mode==='circuit' ? 'ROUND '+(GAME.track+1)+' · ' : '') + tk.name;
+    inm.style.color = tcol; inm.style.textShadow = '0 0 20px '+tcol;
     document.getElementById('introTag').textContent = tk.tag;
     intro.style.display='flex'; requestAnimationFrame(()=>intro.classList.add('show'));
     Sound.beep(880);
@@ -640,8 +657,8 @@ class Race extends Phaser.Scene {
     const drifting=Math.abs(lat)>50;
     if (drifting && go){
       const rearX=car.x-ncos*20, rearY=car.y-nsin*20, off=9;
-      this.skid.draw('skidmark', rearX+nrx*off, rearY+nry*off, 1, 0xff8a3d);
-      this.skid.draw('skidmark', rearX-nrx*off, rearY-nry*off, 1, 0x2bff9e);
+      this.skid.draw('skidmark', rearX+nrx*off, rearY+nry*off, 1, this.theme.skidA);
+      this.skid.draw('skidmark', rearX-nrx*off, rearY-nry*off, 1, this.theme.skidB);
       if (time%2<1) this.dust.explode(2, rearX, rearY);
       Sound.setSkid(Phaser.Math.Clamp(Math.abs(lat)/200,0,1));
     } else Sound.setSkid(0);
