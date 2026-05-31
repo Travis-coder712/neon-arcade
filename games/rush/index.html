@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1a0833" />
+<title>Neon Rush</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#100020; font-family:'Trebuchet MS',system-ui,sans-serif; touch-action:none; }
+  canvas { display:block; }
+  #hud { position:fixed; top:env(safe-area-inset-top,12px); left:0; right:0; display:flex; justify-content:center; gap:14px; padding:10px; z-index:10; pointer-events:none; }
+  .panel { background:rgba(30,8,55,0.5); border:1px solid rgba(255,61,240,0.45); border-radius:12px; padding:7px 16px; color:#ffe6fc; text-shadow:0 0 8px rgba(255,61,240,0.7); backdrop-filter:blur(4px); min-width:88px; text-align:center; }
+  .panel .label { font-size:10px; letter-spacing:2px; opacity:.7; }
+  .panel .value { font-size:21px; font-weight:bold; font-variant-numeric:tabular-nums; }
+  #bestP { border-color:rgba(0,240,255,0.5); } #bestP .label,#bestP .value { color:#9fe9ff; text-shadow:0 0 8px rgba(0,240,255,.8); }
+  #controls { position:fixed; inset:0; z-index:9; pointer-events:none; }
+  .btn { position:absolute; bottom:calc(env(safe-area-inset-bottom,18px) + 20px); width:108px; height:108px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:46px; color:#ffe6fc; pointer-events:auto; user-select:none; border:2px solid rgba(255,61,240,0.55); background:rgba(255,61,240,0.08); text-shadow:0 0 12px rgba(255,61,240,.9); transition:transform .05s, background .1s; }
+  .btn.held { background:rgba(255,61,240,0.32); transform:scale(.93); }
+  #left { left:calc(env(safe-area-inset-left,0px) + 20px); }
+  #right { right:calc(env(safe-area-inset-right,0px) + 20px); }
+  .overlay { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; background:radial-gradient(circle at 50% 35%, rgba(80,20,120,0.55), rgba(16,0,32,0.94)); backdrop-filter:blur(2px); padding:20px; }
+  h1 { font-size:13vw; letter-spacing:4px; font-style:italic; color:#ff3df0; text-shadow:0 0 18px #ff3df0,0 0 44px rgba(255,61,240,.6); }
+  .sub { color:#9fe9ff; letter-spacing:4px; font-size:4vw; text-shadow:0 0 14px rgba(0,240,255,.8); }
+  p { color:#d7c4ee; font-size:14px; line-height:1.7; max-width:330px; }
+  .play { margin-top:6px; padding:14px 46px; font-size:22px; letter-spacing:3px; font-weight:bold; color:#16002a; background:linear-gradient(90deg,#ff3df0,#ff9bf4); border:none; border-radius:40px; box-shadow:0 0 26px rgba(255,61,240,.7); cursor:pointer; }
+  .play:active { transform:scale(.96); }
+  kbd { background:#2a1140; border:1px solid #51246e; border-radius:5px; padding:1px 7px; color:#ffb3f6; font-size:12px; }
+  #over { display:none; }
+  #over .stat { color:#9fe9ff; font-size:18px; text-shadow:0 0 10px rgba(0,240,255,.7); }
+  .back { position:fixed; top:env(safe-area-inset-top,10px); left:10px; z-index:11; color:#ffb3f6; text-decoration:none; font-size:13px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); border-radius:9px; padding:6px 11px; }
+  .mutebtn { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); color:#ffb3f6; }
+</style>
+<script src="../../shared/audio.js"></script>
+<script type="importmap">{ "imports": { "three": "../../vendor/three.module.js" } }</script>
+</head>
+<body>
+<a class="back" href="../../index.html">‹ ARCADE</a>
+<button class="mutebtn" id="mute">🔊</button>
+
+<div id="hud">
+  <div class="panel"><div class="label">SPEED</div><div class="value" id="speed">0</div></div>
+  <div class="panel"><div class="label">SCORE</div><div class="value" id="score">0</div></div>
+  <div class="panel" id="bestP"><div class="label">BEST</div><div class="value" id="best">0</div></div>
+</div>
+<div id="controls"><div class="btn" id="left">◄</div><div class="btn" id="right">►</div></div>
+
+<div class="overlay" id="title">
+  <h1>NEON RUSH</h1>
+  <div class="sub">★ 3D ENDLESS RACER ★</div>
+  <p>Weave through traffic at full speed. Swap lanes with <kbd>◄</kbd> <kbd>►</kbd> (or the <kbd>←</kbd> <kbd>→</kbd> arrows / tap the screen sides). Don't crash — you get faster the longer you survive.</p>
+  <button class="play" id="playBtn">DRIVE ▶</button>
+</div>
+<div class="overlay" id="over">
+  <h1>CRASHED</h1>
+  <div class="stat" id="finalScore">Score: 0</div>
+  <div class="stat" id="finalBest">Best: 0</div>
+  <button class="play" id="againBtn" style="background:linear-gradient(90deg,#00f0ff,#9bf6ff);box-shadow:0 0 24px rgba(0,240,255,.7);">RETRY ▶</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x2a0a4a, 40, 150);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 600);
+camera.position.set(0, 6.2, 12); camera.lookAt(0, 1.5, -22);
+
+scene.add(new THREE.HemisphereLight(0xff66ff, 0x2200ff, 0.9));
+const key=new THREE.DirectionalLight(0xffffff,1.1); key.position.set(-6,14,6); scene.add(key);
+const rim=new THREE.PointLight(0x00f0ff,1.2,60); rim.position.set(0,8,14); scene.add(rim);
+
+function makeSunTexture(){ const c=document.createElement('canvas'); c.width=512;c.height=512; const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,512); g.addColorStop(0,'#ffe14d'); g.addColorStop(.5,'#ff5fa8'); g.addColorStop(1,'#ff2d95');
+  x.fillStyle=g; x.beginPath(); x.arc(256,256,250,0,Math.PI*2); x.fill();
+  x.globalCompositeOperation='destination-out'; for(let i=0;i<11;i++){const h=4+i*2;const y=300+i*22;x.fillRect(0,y,512,h);} return new THREE.CanvasTexture(c); }
+const sun=new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({map:makeSunTexture(),transparent:true,fog:false})); sun.position.set(0,22,-240); scene.add(sun);
+
+const sky=new THREE.Mesh(new THREE.PlaneGeometry(900,400),(()=>{const c=document.createElement('canvas');c.width=4;c.height=256;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#1a0636');g.addColorStop(.6,'#3a0f63');g.addColorStop(1,'#8a1f7a');x.fillStyle=g;x.fillRect(0,0,4,256);return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),fog:false,depthWrite:false});})()); sky.position.set(0,40,-300); scene.add(sky);
+
+function makeGridTexture(){ const c=document.createElement('canvas');c.width=256;c.height=256;const x=c.getContext('2d');x.fillStyle='#160a2e';x.fillRect(0,0,256,256);x.strokeStyle='#00f0ff';x.lineWidth=3;x.shadowColor='#00f0ff';x.shadowBlur=6;for(let i=0;i<=256;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(14,40);return t; }
+const gridTex=makeGridTexture();
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,1200), new THREE.MeshBasicMaterial({map:gridTex})); ground.rotation.x=-Math.PI/2; ground.position.set(0,-0.05,-380); scene.add(ground);
+
+const ROAD_HALF=9;
+const road=new THREE.Mesh(new THREE.PlaneGeometry(ROAD_HALF*2,1200), new THREE.MeshStandardMaterial({color:0x0b0820,roughness:.55,metalness:.4})); road.rotation.x=-Math.PI/2; road.position.set(0,0,-380); scene.add(road);
+const LANES=[-6,0,6];
+function neonStrip(x,w,color){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,1200),new THREE.MeshBasicMaterial({color}));m.rotation.x=-Math.PI/2;m.position.set(x,0.02,-380);scene.add(m);}
+neonStrip(-3,0.18,0x00f0ff); neonStrip(3,0.18,0x00f0ff); neonStrip(-ROAD_HALF,0.3,0xff3df0); neonStrip(ROAD_HALF,0.3,0xff3df0);
+
+function buildCar(bodyColor,accent){const car=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.9,4.4),new THREE.MeshStandardMaterial({color:bodyColor,metalness:.7,roughness:.25,emissive:accent,emissiveIntensity:.35}));body.position.y=.7;car.add(body);
+  const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.7,.7,2.0),new THREE.MeshStandardMaterial({color:0x0bd8ff,metalness:.9,roughness:.1,emissive:0x0bd8ff,emissiveIntensity:.4}));cabin.position.set(0,1.35,-.2);car.add(cabin);
+  const wheelGeo=new THREE.CylinderGeometry(.5,.5,.4,14),wheelMat=new THREE.MeshStandardMaterial({color:0x111118,roughness:.8});
+  [[-1.1,-1.5],[1.1,-1.5],[-1.1,1.5],[1.1,1.5]].forEach(([wx,wz])=>{const w=new THREE.Mesh(wheelGeo,wheelMat);w.rotation.z=Math.PI/2;w.position.set(wx,.4,wz);car.add(w);});
+  const glow=new THREE.Mesh(new THREE.PlaneGeometry(2.6,4.8),new THREE.MeshBasicMaterial({color:accent,transparent:true,opacity:.5}));glow.rotation.x=-Math.PI/2;glow.position.y=.06;car.add(glow);
+  return car; }
+const player=buildCar(0xff3df0,0xff3df0); player.position.set(0,0,4); scene.add(player);
+
+const TRAFFIC_COLORS=[0x00f0ff,0xffe14d,0x7d5cff,0x39ff88,0xff7a3d];
+const traffic=[]; const NUM_TRAFFIC=7;
+for(let i=0;i<NUM_TRAFFIC;i++){const c=TRAFFIC_COLORS[i%TRAFFIC_COLORS.length];const t=buildCar(c,c);resetTraffic(t,-60-i*28);t.userData.warned=false;scene.add(t);traffic.push(t);}
+function resetTraffic(t,z){t.position.set(LANES[(Math.random()*3)|0],0,z);t.userData.passed=false;t.userData.warned=false;}
+
+const pylons=[]; for(let i=0;i<26;i++){const side=i%2===0?-1:1;const p=new THREE.Mesh(new THREE.BoxGeometry(.4,3.4,.4),new THREE.MeshStandardMaterial({color:0x12203a,emissive:0x00f0ff,emissiveIntensity:.8}));p.position.set(side*(ROAD_HALF+1.6),1.7,-((i>>1)*18)-8);scene.add(p);pylons.push(p);}
+
+const state={running:false,speed:0,baseSpeed:55,score:0,best:Number(localStorage.getItem('neonRushBest')||0),targetLane:1,invuln:0};
+document.getElementById('best').textContent=state.best;
+function shift(dir){ if(!state.running)return; state.targetLane=Math.max(0,Math.min(2,state.targetLane+dir)); }
+
+const clock=new THREE.Clock();
+function animate(){ requestAnimationFrame(animate); const dt=Math.min(clock.getDelta(),.05);
+  if(state.running){
+    state.speed=state.baseSpeed+Math.min(state.score*.06,90);
+    const move=state.speed*dt; state.score+=move*.6;
+    gridTex.offset.y-=move*.012;
+    const tx=LANES[state.targetLane];
+    player.position.x+=(tx-player.position.x)*Math.min(dt*10,1);
+    player.rotation.z=(tx-player.position.x)*-.12;
+    player.position.y=Math.sin(clock.elapsedTime*18)*.03;
+    for(const t of traffic){ t.position.z+=move;
+      if(t.position.z>18) resetTraffic(t,-200-Math.random()*60);
+      // near-miss whoosh
+      if(!t.userData.warned && t.position.z>-6 && t.position.z<2 && Math.abs(t.position.x-player.position.x)>2.2 && Math.abs(t.position.x-player.position.x)<5){ t.userData.warned=true; if(window.Sound)Sound.whoosh(); }
+      if(state.invuln<=0 && Math.abs(t.position.z-player.position.z)<3.6 && Math.abs(t.position.x-player.position.x)<2.1) crash();
+    }
+    for(const p of pylons){ p.position.z+=move; if(p.position.z>16) p.position.z-=234; }
+    if(state.invuln>0){state.invuln-=dt;player.visible=(Math.floor(clock.elapsedTime*20)%2===0);} else player.visible=true;
+    document.getElementById('speed').textContent=Math.round(state.speed*2.4);
+    document.getElementById('score').textContent=Math.floor(state.score);
+    if(window.Sound) Sound.setEngine(Math.min(state.speed/150,1));
+  }
+  camera.position.x+=(player.position.x*.35-camera.position.x)*Math.min(dt*4,1);
+  camera.lookAt(player.position.x*.5,1.5,-22);
+  renderer.render(scene,camera);
+}
+animate();
+
+function crash(){ state.running=false; if(window.Sound){Sound.crash();Sound.stopEngine();}
+  if(state.score>state.best){state.best=Math.floor(state.score);localStorage.setItem('neonRushBest',state.best);}
+  document.getElementById('finalScore').textContent='Score: '+Math.floor(state.score);
+  document.getElementById('finalBest').textContent='Best: '+state.best;
+  document.getElementById('best').textContent=state.best;
+  document.getElementById('over').style.display='flex'; }
+
+function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();}
+  state.running=true;state.score=0;state.speed=state.baseSpeed;state.targetLane=1;state.invuln=1.2;
+  player.position.set(0,0,4);player.visible=true;
+  traffic.forEach((t,i)=>resetTraffic(t,-60-i*28));
+  document.getElementById('title').style.display='none'; document.getElementById('over').style.display='none'; }
+
+function bindBtn(id,dir){const el=document.getElementById(id);const fire=e=>{e.preventDefault();shift(dir);el.classList.add('held');setTimeout(()=>el.classList.remove('held'),120);};el.addEventListener('touchstart',fire,{passive:false});el.addEventListener('mousedown',fire);}
+bindBtn('left',-1); bindBtn('right',1);
+renderer.domElement.addEventListener('touchstart',e=>{if(!state.running)return;shift(e.touches[0].clientX<window.innerWidth/2?-1:1);},{passive:true});
+window.addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='ArrowLeft'||e.code==='KeyA')shift(-1);if(e.code==='ArrowRight'||e.code==='KeyD')shift(1);});
+document.getElementById('playBtn').addEventListener('click',startGame);
+document.getElementById('againBtn').addEventListener('click',startGame);
+window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+
+const muteBtn=document.getElementById('mute'); let muted=false;
+muteBtn.addEventListener('click',()=>{muted=!muted;if(window.Sound&&Sound.ctx)Sound.setMuted(muted);muteBtn.textContent=muted?'🔇':'🔊';});
+window.__g={state,traffic,player,LANES,shift};
+</script>
+</body>
+</html>

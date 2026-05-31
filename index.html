@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Neon Arcade" />
+<meta name="theme-color" content="#0a0612" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<title>Neon Arcade</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { min-height:100%; background:#0a0612; color:#fff; font-family:'Trebuchet MS',system-ui,sans-serif; overflow-x:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; padding:calc(env(safe-area-inset-top,0px) + 30px) 18px calc(env(safe-area-inset-bottom,0px) + 40px);
+         background:
+           radial-gradient(circle at 20% 0%, rgba(43,255,158,0.12), transparent 45%),
+           radial-gradient(circle at 80% 10%, rgba(255,61,240,0.16), transparent 45%),
+           #0a0612; min-height:100vh; }
+  .badge { font-size:11px; letter-spacing:3px; color:#8fa; border:1px solid rgba(43,255,158,.4); border-radius:20px; padding:4px 14px; opacity:.85; margin-bottom:18px; text-shadow:0 0 8px rgba(43,255,158,.5); }
+  h1 { font-size:clamp(40px,13vw,82px); font-style:italic; letter-spacing:4px; text-align:center; line-height:1;
+       background:linear-gradient(90deg,#2bff9e,#19e0ff,#ff3df0,#ff8a3d); -webkit-background-clip:text; background-clip:text; color:transparent;
+       filter:drop-shadow(0 0 22px rgba(255,61,240,.4)); }
+  .tagline { color:#b8a8d8; margin:10px 0 30px; text-align:center; font-size:15px; letter-spacing:1px; }
+  .cards { display:flex; flex-wrap:wrap; gap:20px; justify-content:center; width:100%; max-width:760px; }
+  .card { position:relative; flex:1 1 300px; max-width:360px; border-radius:22px; overflow:hidden; text-decoration:none; color:#fff;
+          aspect-ratio:16/11; display:flex; flex-direction:column; justify-content:flex-end; padding:22px; transition:transform .15s, box-shadow .15s; }
+  .card:active { transform:scale(.98); }
+  .card .art { position:absolute; inset:0; z-index:0; }
+  .card .meta { position:relative; z-index:1; }
+  .card h2 { font-size:30px; font-style:italic; letter-spacing:2px; }
+  .card .desc { font-size:13px; opacity:.9; margin-top:4px; line-height:1.5; }
+  .card .go { display:inline-block; margin-top:14px; font-weight:bold; letter-spacing:2px; padding:9px 22px; border-radius:30px; font-size:14px; }
+
+  /* Drift card — tropical circuit (green/orange) */
+  #drift { box-shadow:0 0 30px rgba(43,255,158,.25); border:1px solid rgba(43,255,158,.4); }
+  #drift .art { background:
+      radial-gradient(circle at 70% 20%, rgba(255,138,61,.5), transparent 50%),
+      linear-gradient(160deg,#052b25,#04141a 70%); }
+  #drift h2 { color:#2bff9e; text-shadow:0 0 16px rgba(43,255,158,.7); }
+  #drift .go { background:linear-gradient(90deg,#2bff9e,#aaffd9); color:#04141a; box-shadow:0 0 18px rgba(43,255,158,.6); }
+
+  /* Rush card — synthwave (purple/pink) */
+  #rush { box-shadow:0 0 30px rgba(255,61,240,.25); border:1px solid rgba(255,61,240,.4); }
+  #rush .art { background:
+      radial-gradient(circle at 50% 25%, rgba(255,225,77,.5), rgba(255,61,240,.35) 30%, transparent 55%),
+      linear-gradient(160deg,#2a0a4a,#100020 75%); }
+  #rush h2 { color:#ff3df0; text-shadow:0 0 16px rgba(255,61,240,.7); }
+  #rush .go { background:linear-gradient(90deg,#ff3df0,#ff9bf4); color:#16002a; box-shadow:0 0 18px rgba(255,61,240,.6); }
+
+  /* mini neon grid art inside cards */
+  .grid { position:absolute; inset:0; z-index:0; opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
+    background-size:26px 26px; mask-image:linear-gradient(to top, #000, transparent 70%); -webkit-mask-image:linear-gradient(to top,#000,transparent 70%); }
+
+  #install { margin-top:34px; text-align:center; color:#9aa; font-size:13px; line-height:1.7; max-width:420px; }
+  #install b { color:#cfe; }
+  #installBtn { display:none; margin-top:14px; padding:11px 28px; border:none; border-radius:30px; font-weight:bold; letter-spacing:2px;
+                background:linear-gradient(90deg,#19e0ff,#2bff9e); color:#04141a; box-shadow:0 0 20px rgba(25,224,255,.6); cursor:pointer; }
+  footer { margin-top:30px; color:#665a7a; font-size:11px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+  <div class="badge">★ IN DEVELOPMENT ★</div>
+  <h1>NEON ARCADE</h1>
+  <div class="tagline">Two racers, built end-to-end by Claude. Tap to play.</div>
+
+  <div class="cards">
+    <a class="card" id="drift" href="games/drift/index.html">
+      <div class="art"></div><div class="grid"></div>
+      <div class="meta">
+        <h2>NEON DRIFT</h2>
+        <div class="desc">Top-down 2D drift racer. 3 laps vs AI, chase the track record.</div>
+        <span class="go">PLAY ▶</span>
+      </div>
+    </a>
+    <a class="card" id="rush" href="games/rush/index.html">
+      <div class="art"></div><div class="grid"></div>
+      <div class="meta">
+        <h2>NEON RUSH</h2>
+        <div class="desc">Real-3D synthwave endless racer. Dodge traffic, go faster, survive.</div>
+        <span class="go">PLAY ▶</span>
+      </div>
+    </a>
+  </div>
+
+  <div id="install">
+    <b>Add to your home screen</b> for a fullscreen, app-like experience that works offline.<br>
+    On iPhone: tap <b>Share</b> → <b>Add to Home Screen</b>.
+    <br><button id="installBtn">⤓ INSTALL APP</button>
+  </div>
+
+  <footer>NEON ARCADE · made with Claude Code</footer>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+  let deferred;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; document.getElementById('installBtn').style.display='inline-block'; });
+  document.getElementById('installBtn').addEventListener('click', async () => { if(!deferred)return; deferred.prompt(); deferred=null; document.getElementById('installBtn').style.display='none'; });
+</script>
+</body>
+</html>
