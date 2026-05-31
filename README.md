@@ -12,9 +12,15 @@ Two browser racing games, built end-to-end with Claude Code — an experiment in
 ## Tech notes
 
 - 100% client-side, zero build step — plain HTML/JS.
-- All art (cars, track, neon grid, synthwave sun) and **all sound** (engine, tyre skid, crash, fanfare) are generated procedurally in code — there are no image or audio asset files.
+- **All sound is generated procedurally in code** (WebAudio) — engine (gear-shift model), tyre skid, crash, plus a per-game **soundtrack** (bass + pad + arp + lead melody + drums + echo). No audio files.
+- **3D cars (Neon Rush):** [Kenney Car Kit](https://kenney.nl/assets/car-kit) — **CC0** low-poly models (`vendor/cars/`), loaded with three.js `GLTFLoader`. Pick your car on the title screen.
+- **2D art (Neon Drift):** procedural — cars, closed-loop track, textured ground, track-side running lights, synthwave scenery.
 - Game libraries ([Phaser](https://phaser.io/) and [Three.js](https://threejs.org/)) are vendored locally under `vendor/` so the PWA works fully offline.
 - Installable PWA: `manifest.webmanifest` + a cache-first service worker (`sw.js`).
+
+## Credits
+
+- 3D car models: **Kenney** — Car Kit (CC0 / public domain), kenney.nl.
 
 ## Controls
 

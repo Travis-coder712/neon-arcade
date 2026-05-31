@@ -1,5 +1,5 @@
 /* Neon Arcade service worker — cache-first offline support */
-const CACHE = 'neon-arcade-v2';
+const CACHE = 'neon-arcade-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,16 @@ const ASSETS = [
   './shared/leaderboard.js',
   './vendor/phaser.min.js',
   './vendor/three.module.js',
+  './vendor/jsm/loaders/GLTFLoader.js',
+  './vendor/jsm/utils/BufferGeometryUtils.js',
+  './vendor/cars/race.glb',
+  './vendor/cars/race-future.glb',
+  './vendor/cars/sedan-sports.glb',
+  './vendor/cars/hatchback-sports.glb',
+  './vendor/cars/police.glb',
+  './vendor/cars/suv-luxury.glb',
+  './vendor/cars/taxi.glb',
+  './vendor/cars/Textures/colormap.png',
   './games/drift/index.html',
   './games/rush/index.html',
   './icons/icon-192.png',

@@ -264,6 +264,22 @@ class Race extends Phaser.Scene {
     if (this.textures.exists('glow')) this.textures.remove('glow');
     this.textures.addCanvas('glow', cv);
 
+    // textured ground (subtle tarmac/tech — replaces the harsh bright grid)
+    const gv = document.createElement('canvas'); gv.width = gv.height = 512; const gx = gv.getContext('2d');
+    const bgGrad = gx.createLinearGradient(0,0,512,512);
+    bgGrad.addColorStop(0,'#071a20'); bgGrad.addColorStop(1,'#04101a');
+    gx.fillStyle = bgGrad; gx.fillRect(0,0,512,512);
+    // fine speckle
+    for (let i=0;i<2600;i++){ const a=Math.random()*0.04; gx.fillStyle='rgba(43,255,158,'+a+')'; gx.fillRect(Math.random()*512, Math.random()*512, 2, 2); }
+    // faint coarse grid
+    gx.strokeStyle='rgba(43,255,158,0.045)'; gx.lineWidth=1;
+    for (let i=0;i<=512;i+=64){ gx.beginPath();gx.moveTo(i,0);gx.lineTo(i,512);gx.stroke(); gx.beginPath();gx.moveTo(0,i);gx.lineTo(512,i);gx.stroke(); }
+    // a few subtle hex/tech accents
+    gx.strokeStyle='rgba(25,224,255,0.05)';
+    for (let i=0;i<8;i++){ const x=Math.random()*512,y=Math.random()*512,r=20+Math.random()*40; gx.beginPath(); gx.arc(x,y,r,0,Math.PI*2); gx.stroke(); }
+    if (this.textures.exists('ground')) this.textures.remove('ground');
+    this.textures.addCanvas('ground', gv);
+
     // detailed top-down car, one texture per skin (front faces +x)
     SKINS.forEach(sk => this.drawCar('car_'+sk.id, sk));
   }
@@ -310,11 +326,8 @@ class Race extends Phaser.Scene {
   }
 
   drawWorld() {
-    const bg = this.add.graphics().setDepth(0);
-    bg.fillStyle(0x04141a,1); bg.fillRect(-300,-300,WORLD_W+600,WORLD_H+600);
-    bg.lineStyle(1,0x0c3a36,0.6);
-    for (let x=-300;x<WORLD_W+600;x+=64){ bg.beginPath(); bg.moveTo(x,-300); bg.lineTo(x,WORLD_H+300); bg.strokePath(); }
-    for (let y=-300;y<WORLD_H+600;y+=64){ bg.beginPath(); bg.moveTo(-300,y); bg.lineTo(WORLD_W+300,y); bg.strokePath(); }
+    this.add.graphics().setDepth(-2).fillStyle(0x04101a,1).fillRect(-400,-400,WORLD_W+800,WORLD_H+800);
+    this.add.tileSprite(WORLD_W/2, WORLD_H/2, WORLD_W+800, WORLD_H+800, 'ground').setDepth(-1);
 
     const path=this.center, road=this.add.graphics().setDepth(0);
     const loop=(w,c,a)=>{ road.lineStyle(w,c,a); road.beginPath(); road.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) road.lineTo(path[i].x,path[i].y); road.strokePath(); };
@@ -336,49 +349,48 @@ class Race extends Phaser.Scene {
 
   // decorative neon scenery scattered OUTSIDE the track on the grass
   drawScenery() {
-    const sc = this.add.graphics().setDepth(0);
-    const farFromTrack = (x,y) => { for(let i=0;i<this.N;i+=4){const dx=this.center[i].x-x,dy=this.center[i].y-y;if(dx*dx+dy*dy<(HALF_ROAD+70)*(HALF_ROAD+70))return false;} return true; };
-    const rng = (seed=>()=>{ seed=(seed*9301+49297)%233280; return seed/233280; })(7);
+    const path = this.center, N = this.N;
 
-    // palm trees (neon green)
-    let placed=0, tries=0;
-    while (placed<26 && tries<600) {
-      tries++;
-      const x=rng()*WORLD_W, y=rng()*WORLD_H;
-      if (!farFromTrack(x,y)) continue;
-      placed++;
-      const h=34+rng()*26;
-      sc.lineStyle(4,0x6a4a2a,1); sc.beginPath(); sc.moveTo(x,y); sc.lineTo(x,y-h); sc.strokePath();
-      sc.lineStyle(3,0x2bff9e,0.9);
-      for (let f=0;f<6;f++){ const ang=-Math.PI/2 + (f-2.5)*0.5; const fl=20+rng()*14; sc.beginPath(); sc.moveTo(x,y-h); sc.lineTo(x+Math.cos(ang)*fl, y-h+Math.sin(ang)*fl); sc.strokePath(); }
-      sc.fillStyle(0xffd23d,0.9); sc.fillCircle(x,y-h,3);
-    }
-    // glowing geometric pads
-    placed=0; tries=0;
-    while (placed<14 && tries<400) {
-      tries++; const x=rng()*WORLD_W, y=rng()*WORLD_H;
-      if (!farFromTrack(x,y)) continue; placed++;
-      const r=14+rng()*22, col=[0x19e0ff,0xff3df0,0xff8a3d,0xb6ff3d][(rng()*4)|0];
-      sc.lineStyle(2,col,0.7); sc.strokeCircle(x,y,r); sc.fillStyle(col,0.08); sc.fillCircle(x,y,r);
+    // infield emblem (inside the loop) — big faint concentric rings + wordmark
+    let ix=0, iy=0; for (let i=0;i<N;i++){ ix+=path[i].x; iy+=path[i].y; } ix/=N; iy/=N;
+    const em = this.add.graphics().setDepth(-1);
+    [220,170,120].forEach((r,k)=>{ em.lineStyle(2, [0x2bff9e,0x19e0ff,0xff8a3d][k], 0.10); em.strokeCircle(ix,iy,r); });
+    const wm = this.add.text(ix, iy, 'NEON\nDRIFT', {fontFamily:'Trebuchet MS',fontSize:'58px',fontStyle:'bold italic',color:'#2bff9e',align:'center'}).setOrigin(0.5).setDepth(-1).setAlpha(0.10);
+    wm.setLineSpacing(-8);
+
+    // track-side running lights: glowing posts just off both edges, all the way round
+    const lights = this.add.graphics().setDepth(0);
+    for (let i=0; i<N; i+=11) {
+      const a = this.angleAt(i), nx = Math.cos(a+Math.PI/2), ny = Math.sin(a+Math.PI/2);
+      const col = (i % 22 === 0) ? 0xff8a3d : 0x2bff9e;
+      for (const sgn of [1,-1]) {
+        const x = path[i].x + nx*(HALF_ROAD+18)*sgn, y = path[i].y + ny*(HALF_ROAD+18)*sgn;
+        lights.fillStyle(col, 0.9); lights.fillCircle(x, y, 3.2);
+        lights.fillStyle(col, 0.18); lights.fillCircle(x, y, 7);
+      }
     }
 
-    // billboards (text) outside track
-    const words=[['NEON','#2bff9e'],['TURBO','#ff8a3d'],['CLAUDE','#19e0ff'],['DRIFT','#ffd23d'],['APEX','#ff3df0']];
-    const spots=[[150,200],[1500,250],[1550,1000],[600,1230],[120,1100]];
-    spots.forEach((s,i)=>{ if(i>=words.length)return;
-      const [txt,col]=words[i];
-      const t=this.add.text(s[0],s[1],txt,{fontFamily:'Trebuchet MS',fontSize:'34px',fontStyle:'bold italic',color:col}).setOrigin(0.5).setDepth(0).setAlpha(0.85);
+    // sponsor billboards (kept — they read well)
+    const words=[['NEON','#2bff9e'],['TURBO','#ff8a3d'],['CLAUDE','#19e0ff'],['APEX','#ff3df0']];
+    const spots=[[150,210],[1530,250],[1560,1010],[150,1090]];
+    spots.forEach((s,i)=>{ const [txt,col]=words[i];
+      const t=this.add.text(s[0],s[1],txt,{fontFamily:'Trebuchet MS',fontSize:'32px',fontStyle:'bold italic',color:col}).setOrigin(0.5).setDepth(0).setAlpha(0.9);
       t.setShadow(0,0,col,16,true,true);
-      const box=this.add.graphics().setDepth(0); box.lineStyle(2,Phaser.Display.Color.HexStringToColor(col).color,0.6); box.strokeRoundedRect(s[0]-t.width/2-12,s[1]-t.height/2-8,t.width+24,t.height+16,8);
+      const c=Phaser.Display.Color.HexStringToColor(col).color;
+      const box=this.add.graphics().setDepth(0);
+      box.fillStyle(0x04101a,0.6); box.fillRoundedRect(s[0]-t.width/2-14,s[1]-t.height/2-9,t.width+28,t.height+18,8);
+      box.lineStyle(2,c,0.7); box.strokeRoundedRect(s[0]-t.width/2-14,s[1]-t.height/2-9,t.width+28,t.height+18,8);
+      // support legs
+      box.lineStyle(3,c,0.4); box.lineBetween(s[0]-14,s[1]+18,s[0]-14,s[1]+44); box.lineBetween(s[0]+14,s[1]+18,s[0]+14,s[1]+44);
     });
 
-    // grandstand rows of crowd lights along a straight
+    // grandstand rows of crowd lights along the top straight
     const gs=this.add.graphics().setDepth(0);
-    for (let r=0;r<3;r++){ for(let c=0;c<22;c++){ const col=[0xff8a3d,0x2bff9e,0x19e0ff,0xffd23d][(c+r)%4]; gs.fillStyle(col,0.55); gs.fillRect(560+c*16, 140+r*10, 9,7); } }
+    for (let r=0;r<3;r++){ for(let c=0;c<22;c++){ const col=[0xff8a3d,0x2bff9e,0x19e0ff,0xffd23d][(c+r)%4]; gs.fillStyle(col,0.55); gs.fillRect(560+c*16, 150+r*10, 9,7); } }
 
     // ambient corner glows for depth
     [[150,150,0x2bff9e],[WORLD_W-150,200,0xff8a3d],[120,WORLD_H-150,0x19e0ff],[WORLD_W-180,WORLD_H-160,0xff3df0]]
-      .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(11).setTint(c).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(0); });
+      .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(12).setTint(c).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1); });
   }
 
   // ---- countdown then go ----
