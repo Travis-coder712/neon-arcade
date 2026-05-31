@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#050a16" />
+<title>Neon Pong</title>
+<script src="../../shared/audio.js"></script>
+<style>
+  :root { --cyan:#19e0ff; --mag:#ff3df0; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#050a16; font-family:'Trebuchet MS',system-ui,sans-serif; touch-action:none; color:#eaf6ff; }
+  canvas { display:block; position:fixed; inset:0; }
+  .back { position:fixed; top:env(safe-area-inset-top,10px); left:10px; z-index:11; color:#9fe9ff; text-decoration:none; font-size:13px; background:rgba(10,20,40,.5); border:1px solid rgba(25,224,255,.35); border-radius:9px; padding:6px 11px; }
+  .toprt { position:fixed; top:env(safe-area-inset-top,10px); right:10px; z-index:11; display:flex; gap:7px; }
+  .iconbtn { width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(10,20,40,.5); border:1px solid rgba(25,224,255,.35); color:#9fe9ff; }
+  .iconbtn.off { opacity:.4; }
+  .overlay { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center;
+             background:radial-gradient(circle at 50% 40%, rgba(20,40,80,0.5), rgba(5,10,22,0.94)); backdrop-filter:blur(2px); padding:22px; }
+  h1 { font-size:14vw; letter-spacing:5px; font-style:italic; color:var(--cyan); text-shadow:0 0 18px var(--cyan),0 0 44px rgba(25,224,255,.5); }
+  .sub { color:var(--mag); letter-spacing:4px; font-size:4vw; text-shadow:0 0 14px rgba(255,61,240,.8); }
+  p { color:#bcd6ee; font-size:14px; line-height:1.7; max-width:330px; }
+  kbd { background:#12203a; border:1px solid #2a4a6a; border-radius:5px; padding:1px 7px; color:#9fe9ff; font-size:12px; }
+  .play { margin-top:6px; padding:14px 44px; font-size:22px; letter-spacing:3px; font-weight:bold; color:#050a16; background:linear-gradient(90deg,var(--cyan),#9bf6ff); border:none; border-radius:40px; box-shadow:0 0 24px rgba(25,224,255,.7); cursor:pointer; }
+  .play:active { transform:scale(.96); }
+  .seg { display:flex; gap:10px; }
+  .seg button { padding:9px 18px; border-radius:24px; border:1px solid rgba(25,224,255,.5); background:rgba(25,224,255,.08); color:#9fe9ff; font-size:14px; letter-spacing:1px; }
+  .seg button.on { background:var(--cyan); color:#050a16; font-weight:bold; }
+  #over { display:none; }
+  .stat { color:#9fe9ff; font-size:18px; text-shadow:0 0 10px rgba(25,224,255,.6); }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<a class="back" href="../../index.html">‹ ARCADE</a>
+<div class="toprt">
+  <button class="iconbtn" id="musicBtn" title="Music">🎵</button>
+  <button class="iconbtn" id="mute" title="All sound">🔊</button>
+</div>
+
+<div class="overlay" id="title">
+  <h1>NEON PONG</h1>
+  <div class="sub">★ FIRST TO 7 ★</div>
+  <p>You're the <b style="color:var(--cyan)">cyan</b> paddle at the bottom. Slide it with your finger (or <kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd>) and beat the AI to 7. Hit the ball off-centre to angle your shots.</p>
+  <div class="seg" id="diff">
+    <button data-d="0.66">EASY</button>
+    <button data-d="0.86" class="on">NORMAL</button>
+    <button data-d="1.06">HARD</button>
+  </div>
+  <button class="play" id="playBtn">PLAY ▶</button>
+  <div class="stat">Longest rally: <b id="bestRally">0</b></div>
+</div>
+
+<div class="overlay" id="over">
+  <h1 id="overTitle">YOU WIN!</h1>
+  <div class="stat" id="overScore">7 – 3</div>
+  <div class="stat">Longest rally this game: <b id="overRally">0</b></div>
+  <button class="play" id="againBtn">PLAY AGAIN ▶</button>
+</div>
+
+<script>
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W, H, DPR;
+function resize(){ DPR = Math.min(window.devicePixelRatio||1, 2); W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; ctx.setTransform(DPR,0,0,DPR,0,0);
+  if (player){ player.y = H-46; ai.y = 46; player.w = ai.w = Math.max(70, Math.min(170, W*0.24)); } }
+window.addEventListener('resize', resize);
+
+const WIN = 7;
+const G = { running:false, pScore:0, aiScore:0, rally:0, bestRally:Number(localStorage.getItem('neonPong.bestRally')||0), aiSkill:0.86 };
+const player = { x:0, y:0, w:120, h:14 };
+const ai     = { x:0, y:0, w:120, h:14 };
+const ball   = { x:0, y:0, vx:0, vy:0, r:9, speed:340 };
+const input  = { left:false, right:false, targetX:null };
+
+resize();
+player.x = ai.x = W/2; ball.x = W/2; ball.y = H/2;
+document.getElementById('bestRally').textContent = G.bestRally;
+
+function serve(dir){ // dir: +1 toward player (down), -1 toward ai (up)
+  ball.x = W/2; ball.y = H/2; ball.speed = 340;
+  const ang = (Math.random()*0.6 - 0.3); // mostly vertical
+  ball.vx = Math.sin(ang)*ball.speed; ball.vy = Math.cos(ang)*ball.speed*dir;
+  G.rally = 0;
+}
+
+function startGame(){
+  if (window.Sound){ Sound.init(); Sound.startMusic(Sound.MUSIC.rush); }
+  G.running=true; G.pScore=0; G.aiScore=0; G.rally=0; G.gameBest=0;
+  player.x = ai.x = W/2;
+  serve(Math.random()<0.5?1:-1);
+  document.getElementById('title').style.display='none';
+  document.getElementById('over').style.display='none';
+}
+
+function score(forPlayer){
+  if (window.Sound) Sound._tone(forPlayer?660:220, 0.25, 'square', 0.2);
+  if (forPlayer) G.pScore++; else G.aiScore++;
+  if (G.pScore>=WIN || G.aiScore>=WIN) return endGame();
+  serve(forPlayer? -1 : 1); // serve toward whoever conceded
+}
+
+function endGame(){
+  G.running=false;
+  const won = G.pScore>G.aiScore;
+  document.getElementById('overTitle').textContent = won ? 'YOU WIN!' : 'AI WINS';
+  document.getElementById('overTitle').style.color = won ? 'var(--cyan)' : 'var(--mag)';
+  document.getElementById('overScore').textContent = G.pScore+' – '+G.aiScore;
+  document.getElementById('overRally').textContent = G.gameBest||0;
+  document.getElementById('over').style.display='flex';
+  if (window.Sound) won ? Sound.record() : Sound.crash();
+}
+
+function bouncePaddle(p, dir){ // dir +1 if ball travelling down (player), -1 up (ai)
+  const half = p.w/2;
+  if (Math.abs(ball.x - p.x) <= half + ball.r){
+    ball.vy = -Math.abs(ball.vy) * (dir>0 ? 1 : -1) * (dir>0?1:1);
+    ball.vy = dir>0 ? -Math.abs(ball.vy) : Math.abs(ball.vy);
+    const off = (ball.x - p.x)/half;            // -1..1
+    ball.speed = Math.min(ball.speed*1.05, 900);
+    const ang = off * 0.9;                       // steer
+    const vlen = ball.speed;
+    ball.vx = Math.sin(ang)*vlen;
+    ball.vy = (dir>0 ? -1 : 1) * Math.cos(ang)*vlen;
+    ball.y = p.y + (dir>0 ? -(p.h/2+ball.r) : (p.h/2+ball.r));
+    G.rally++; G.gameBest=Math.max(G.gameBest||0, G.rally);
+    if (G.rally>G.bestRally){ G.bestRally=G.rally; localStorage.setItem('neonPong.bestRally', G.bestRally); }
+    if (window.Sound) Sound.beep(440 + Math.abs(off)*500);
+    return true;
+  }
+  return false;
+}
+
+let last = 0;
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min((t-last)/1000 || 0, 0.033); last = t;
+
+  if (G.running){
+    // player input
+    const pSpeed = 720;
+    if (input.targetX!=null){ player.x += (input.targetX - player.x) * Math.min(dt*16,1); }
+    if (input.left) player.x -= pSpeed*dt;
+    if (input.right) player.x += pSpeed*dt;
+    player.x = Math.max(player.w/2, Math.min(W-player.w/2, player.x));
+
+    // ai tracks ball
+    const aiSpeed = 360 * G.aiSkill + ball.speed*0.15;
+    const tgt = ball.x + ball.vx*0.06;
+    if (tgt < ai.x-6) ai.x -= aiSpeed*dt; else if (tgt > ai.x+6) ai.x += aiSpeed*dt;
+    ai.x = Math.max(ai.w/2, Math.min(W-ai.w/2, ai.x));
+
+    // ball
+    ball.x += ball.vx*dt; ball.y += ball.vy*dt;
+    if (ball.x < ball.r){ ball.x=ball.r; ball.vx=Math.abs(ball.vx); if(window.Sound)Sound.beep(300); }
+    if (ball.x > W-ball.r){ ball.x=W-ball.r; ball.vx=-Math.abs(ball.vx); if(window.Sound)Sound.beep(300); }
+    if (ball.vy>0 && ball.y+ball.r >= player.y-player.h/2 && ball.y < player.y+20) bouncePaddle(player, 1);
+    if (ball.vy<0 && ball.y-ball.r <= ai.y+ai.h/2 && ball.y > ai.y-20) bouncePaddle(ai, -1);
+    if (ball.y > H+30) score(false);     // passed player -> AI scores
+    if (ball.y < -30) score(true);       // passed ai -> player scores
+  }
+
+  draw();
+}
+
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function draw(){
+  ctx.fillStyle = '#050a16'; ctx.fillRect(0,0,W,H);
+  // faint grid
+  ctx.strokeStyle = 'rgba(25,224,255,0.05)'; ctx.lineWidth=1;
+  for (let x=0;x<W;x+=44){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0;y<H;y+=44){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // centre net
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=3; ctx.setLineDash([14,16]);
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); ctx.setLineDash([]);
+  // scores
+  ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle='#19e0ff'; ctx.font='bold 64px Trebuchet MS'; ctx.textAlign='center';
+  ctx.fillText(G.pScore, W/2, H/2+90); ctx.fillStyle='#ff3df0'; ctx.fillText(G.aiScore, W/2, H/2-50); ctx.restore();
+
+  drawPaddle(player, '#19e0ff'); drawPaddle(ai, '#ff3df0');
+  // ball
+  ctx.save(); ctx.shadowColor='#ffffff'; ctx.shadowBlur=18; ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill(); ctx.restore();
+}
+function drawPaddle(p, col){
+  ctx.save(); ctx.shadowColor=col; ctx.shadowBlur=20; ctx.fillStyle=col;
+  roundRect(p.x-p.w/2, p.y-p.h/2, p.w, p.h, 7); ctx.fill(); ctx.restore();
+}
+requestAnimationFrame(loop);
+
+// ---- input ----
+function pointer(e){ const t = e.touches ? e.touches[0] : e; if(!t) return; input.targetX = t.clientX; }
+cv.addEventListener('touchstart', e=>{ e.preventDefault(); pointer(e); }, {passive:false});
+cv.addEventListener('touchmove',  e=>{ e.preventDefault(); pointer(e); }, {passive:false});
+cv.addEventListener('mousedown', e=>{ input._down=true; pointer(e); });
+cv.addEventListener('mousemove', e=>{ if(input._down) pointer(e); });
+window.addEventListener('mouseup', ()=>{ input._down=false; });
+window.addEventListener('keydown', e=>{ if(e.code==='ArrowLeft'||e.code==='KeyA'){input.left=true;input.targetX=null;} if(e.code==='ArrowRight'||e.code==='KeyD'){input.right=true;input.targetX=null;} });
+window.addEventListener('keyup',   e=>{ if(e.code==='ArrowLeft'||e.code==='KeyA')input.left=false; if(e.code==='ArrowRight'||e.code==='KeyD')input.right=false; });
+
+// difficulty
+document.querySelectorAll('#diff button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#diff button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  G.aiSkill = parseFloat(b.dataset.d); if(window.Sound&&Sound.ctx) Sound.beep(660);
+}));
+
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('againBtn').addEventListener('click', startGame);
+
+const muteBtn=document.getElementById('mute'); let muted=false;
+muteBtn.addEventListener('click',()=>{ muted=!muted; if(window.Sound&&Sound.ctx)Sound.setMuted(muted); muteBtn.textContent=muted?'🔇':'🔊'; muteBtn.classList.toggle('off',muted); });
+const musicBtn=document.getElementById('musicBtn'); let musicOff=false;
+musicBtn.addEventListener('click',()=>{ musicOff=!musicOff; if(window.Sound&&Sound.ctx)Sound.setMusicMuted(musicOff); musicBtn.classList.toggle('off',musicOff); });
+</script>
+</body>
+</html>

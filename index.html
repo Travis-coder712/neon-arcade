@@ -49,6 +49,23 @@
   #rush h2 { color:#ff3df0; text-shadow:0 0 16px rgba(255,61,240,.7); }
   #rush .go { background:linear-gradient(90deg,#ff3df0,#ff9bf4); color:#16002a; box-shadow:0 0 18px rgba(255,61,240,.6); }
 
+  /* Pong card — electric cyan */
+  #pong { box-shadow:0 0 30px rgba(25,224,255,.25); border:1px solid rgba(25,224,255,.4); }
+  #pong .art { background:
+      radial-gradient(circle at 30% 30%, rgba(25,224,255,.45), transparent 50%),
+      radial-gradient(circle at 75% 70%, rgba(255,61,240,.35), transparent 50%),
+      linear-gradient(160deg,#0a1f33,#050a16 75%); }
+  #pong h2 { color:#19e0ff; text-shadow:0 0 16px rgba(25,224,255,.7); }
+  #pong .go { background:linear-gradient(90deg,#19e0ff,#9bf6ff); color:#050a16; box-shadow:0 0 18px rgba(25,224,255,.6); }
+
+  /* Muncher card — arcade yellow on blue */
+  #pacman { box-shadow:0 0 30px rgba(255,225,77,.22); border:1px solid rgba(255,225,77,.4); }
+  #pacman .art { background:
+      radial-gradient(circle at 50% 35%, rgba(255,225,77,.45), transparent 45%),
+      linear-gradient(160deg,#0e1a4a,#04061a 75%); }
+  #pacman h2 { color:#ffe14d; text-shadow:0 0 16px rgba(255,225,77,.6); }
+  #pacman .go { background:linear-gradient(90deg,#ffe14d,#fff0a8); color:#04061a; box-shadow:0 0 18px rgba(255,225,77,.5); }
+
   /* mini neon grid art inside cards */
   .grid { position:absolute; inset:0; z-index:0; opacity:.5;
     background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
@@ -64,7 +81,7 @@
 <body>
   <div class="badge">★ IN DEVELOPMENT ★</div>
   <h1>NEON ARCADE</h1>
-  <div class="tagline">Two racers, built end-to-end by Claude. Tap to play.</div>
+  <div class="tagline">Four games, built end-to-end by Claude. Tap to play.</div>
 
   <div class="cards">
     <a class="card" id="drift" href="games/drift/index.html">
@@ -80,6 +97,22 @@
       <div class="meta">
         <h2>NEON RUSH</h2>
         <div class="desc">Real-3D synthwave endless racer. Dodge traffic, go faster, survive.</div>
+        <span class="go">PLAY ▶</span>
+      </div>
+    </a>
+    <a class="card" id="pong" href="games/pong/index.html">
+      <div class="art"></div><div class="grid"></div>
+      <div class="meta">
+        <h2>NEON PONG</h2>
+        <div class="desc">The classic, reborn in neon. First to 7 against the AI — pick your difficulty.</div>
+        <span class="go">PLAY ▶</span>
+      </div>
+    </a>
+    <a class="card" id="pacman" href="games/pacman/index.html">
+      <div class="art"></div><div class="grid"></div>
+      <div class="meta">
+        <h2>NEON MUNCHER</h2>
+        <div class="desc">Pac-Man-style maze chase. Eat the dots, grab a power pellet, hunt the ghosts.</div>
         <span class="go">PLAY ▶</span>
       </div>
     </a>
