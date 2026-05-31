@@ -1,5 +1,5 @@
 /* Neon Arcade service worker — cache-first offline support */
-const CACHE = 'neon-arcade-v5';
+const CACHE = 'neon-arcade-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './vendor/cars/taxi.glb',
   './vendor/cars/Textures/colormap.png',
   './vendor/music/rush-nightdrive.mp3',
+  './vendor/music/drift-running.mp3',
   './games/drift/index.html',
   './games/rush/index.html',
   './icons/icon-192.png',

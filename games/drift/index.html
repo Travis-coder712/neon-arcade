@@ -93,6 +93,14 @@
   #trackName { min-width:170px; font-size:18px; font-weight:bold; font-style:italic; letter-spacing:1px; color:#fff; text-shadow:0 0 12px rgba(255,138,61,.7); }
   #trackName small { display:block; font-size:11px; letter-spacing:2px; color:#7fdcc0; font-style:normal; }
   .circuit-pill { font-size:11px; letter-spacing:2px; color:var(--orange); border:1px solid rgba(255,138,61,.5); border-radius:20px; padding:4px 12px; margin-bottom:4px; }
+  #trackTag { font-size:12px; color:#bfe8da; opacity:.85; max-width:320px; line-height:1.5; margin-top:-2px; }
+  /* track intro splash */
+  #intro { position:fixed; inset:0; z-index:19; display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center;
+           background:radial-gradient(circle at 50% 45%, rgba(8,50,45,0.5), rgba(4,16,22,0.88)); padding:24px; pointer-events:none; }
+  #intro.show .intro-flag { transform:scale(1); opacity:1; }
+  .intro-flag { font-size:26vw; line-height:1; transform:scale(.6); opacity:0; transition:transform .4s cubic-bezier(.2,1.4,.4,1), opacity .4s; filter:drop-shadow(0 0 26px rgba(43,255,158,.5)); }
+  .intro-name { font-size:13vw; font-style:italic; font-weight:bold; letter-spacing:4px; color:var(--mint); text-shadow:0 0 20px var(--mint); }
+  .intro-tag { font-size:15px; color:#eafff6; max-width:330px; line-height:1.6; text-shadow:0 0 10px rgba(0,0,0,.6); }
 </style>
 </head>
 <body>
@@ -116,6 +124,11 @@
   <div class="btn" id="right">►</div>
 </div>
 
+<div id="intro">
+  <div class="intro-flag" id="introFlag">🏁</div>
+  <div class="intro-name" id="introName">TRACK</div>
+  <div class="intro-tag" id="introTag"></div>
+</div>
 <div id="count"><span></span></div>
 <div id="banner"><div class="big">★ TRACK RECORD ★</div><div class="t" id="bannerTime"></div></div>
 
@@ -127,6 +140,7 @@
   <div class="carsel" id="carsel"></div>
   <div class="carsel-label">TRACK</div>
   <div class="carpick" id="trackpick"></div>
+  <div id="trackTag"></div>
   <div class="modebtns">
     <button class="play modebtn" id="taBtn">⏱ TIME ATTACK</button>
     <button class="play modebtn" id="circuitBtn">🏁 CIRCUIT</button>
@@ -175,37 +189,43 @@ const SKINS = [
 let selectedSkin = Math.max(0, SKINS.findIndex(s => s.id === localStorage.getItem(SKIN_KEY)));
 if (selectedSkin < 0) selectedSkin = 0;
 
-// procedurally generated lobed loops — angularly ordered so they never self-intersect.
-// complexity (corner count/sharpness) and AI pace increase across the 5 tracks.
-function genTrack(n, rx, ry, amp, lobes, phase) {
-  const pts = [];
-  for (let k=0;k<n;k++){ const th=k/n*Math.PI*2, r=1+amp*Math.sin(lobes*th+phase);
-    pts.push(850+Math.cos(th)*rx*r, 650+Math.sin(th)*ry*r); }
-  return pts;
-}
+// Simplified, stylised outlines inspired by real F1 circuits — ordered by difficulty.
+// Centripetal Catmull-Rom smooths these control points into clean racing lines.
 const TRACKS = [
-  { name:'SUNSET OVAL', pts:genTrack(6, 430,330,0.05,2,0.0),  ai:11.4 },
-  { name:'CORAL BAY',   pts:genTrack(8, 470,360,0.15,3,0.4),  ai:10.6 },
-  { name:'NEON MILE',   pts:genTrack(9, 500,375,0.20,4,0.2),  ai:9.9 },
-  { name:'VORTEX',      pts:genTrack(11,515,385,0.26,5,0.5),  ai:9.2 },
-  { name:'APEX PRIME',  pts:genTrack(13,525,380,0.32,6,0.1),  ai:8.5 }
+  { name:'ITALY', flag:'🇮🇹', tag:'Monza — the Temple of Speed: long flat-out straights into legendary chicanes.', ai:11.2,
+    pts:[1180,1020, 1210,720, 1180,430, 1050,300, 860,330, 760,470, 600,470, 470,600, 590,720, 470,920, 720,1040, 980,1050] },
+  { name:'AUSTRALIA', flag:'🇦🇺', tag:'Albert Park — fast, flowing parkland sweepers around the lake.', ai:10.6,
+    pts:[1180,820, 1280,560, 1160,360, 920,310, 680,360, 470,520, 360,730, 500,940, 770,1030, 1030,950] },
+  { name:'GERMANY', flag:'🇩🇪', tag:'Hockenheim — a blast through the forest into the stadium hairpin.', ai:9.9,
+    pts:[1150,980, 1330,700, 1230,440, 1000,350, 760,400, 560,340, 360,470, 330,690, 540,770, 380,910, 660,970, 940,1050, 1080,1010] },
+  { name:'SINGAPORE', flag:'🇸🇬', tag:'Marina Bay by night — ninety-degree walls under the neon lights.', ai:9.2,
+    pts:[1160,1000, 1200,720, 1330,690, 1300,470, 1090,450, 1070,330, 820,350, 800,540, 600,540, 580,350, 380,430, 350,700, 470,780, 380,950, 700,990, 980,1030] },
+  { name:'MONACO', flag:'🇲🇨', tag:'Jewel of the calendar — barriers inches away, hairpin down to the harbour.', ai:8.5,
+    pts:[980,1010, 1090,820, 980,690, 1080,560, 1030,410, 850,350, 690,420, 560,360, 450,500, 560,650, 410,720, 480,890, 700,930, 600,1050, 860,1030] }
 ];
 // game/session state (survives scene.restart)
 const GAME = { mode:'ta', track:0, circuitStep:0 };  // mode: 'ta' (time attack) | 'circuit'
 
 const input = { left:false, right:false };
 
-// closed Catmull-Rom -> smooth seamless loop (fixes the finish-line kink)
+// closed CENTRIPETAL Catmull-Rom -> smooth seamless loop that won't overshoot/self-loop
+// through sharp hairpins & chicanes (needed for the F1-style circuits).
 function catmullClosed(pts, perSeg) {
-  const out = [], n = pts.length;
+  const n = pts.length, out = [], alpha = 0.5;
+  const tnext = (ti,a,b) => Math.pow(Math.max(1e-4, Math.hypot(b.x-a.x, b.y-a.y)), alpha) + ti;
   for (let i=0;i<n;i++){
     const p0=pts[(i-1+n)%n], p1=pts[i], p2=pts[(i+1)%n], p3=pts[(i+2)%n];
+    const t0=0, t1=tnext(t0,p0,p1), t2=tnext(t1,p1,p2), t3=tnext(t2,p2,p3);
     for (let s=0;s<perSeg;s++){
-      const t=s/perSeg, t2=t*t, t3=t2*t;
+      const t = t1 + (t2-t1)*(s/perSeg);
+      const a1x=(t1-t)/(t1-t0)*p0.x+(t-t0)/(t1-t0)*p1.x, a1y=(t1-t)/(t1-t0)*p0.y+(t-t0)/(t1-t0)*p1.y;
+      const a2x=(t2-t)/(t2-t1)*p1.x+(t-t1)/(t2-t1)*p2.x, a2y=(t2-t)/(t2-t1)*p1.y+(t-t1)/(t2-t1)*p2.y;
+      const a3x=(t3-t)/(t3-t2)*p2.x+(t-t2)/(t3-t2)*p3.x, a3y=(t3-t)/(t3-t2)*p2.y+(t-t2)/(t3-t2)*p3.y;
+      const b1x=(t2-t)/(t2-t0)*a1x+(t-t0)/(t2-t0)*a2x, b1y=(t2-t)/(t2-t0)*a1y+(t-t0)/(t2-t0)*a2y;
+      const b2x=(t3-t)/(t3-t1)*a2x+(t-t1)/(t3-t1)*a3x, b2y=(t3-t)/(t3-t1)*a2y+(t-t1)/(t3-t1)*a3y;
       out.push(new Phaser.Math.Vector2(
-        0.5*((2*p1.x)+(-p0.x+p2.x)*t+(2*p0.x-5*p1.x+4*p2.x-p3.x)*t2+(-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
-        0.5*((2*p1.y)+(-p0.y+p2.y)*t+(2*p0.y-5*p1.y+4*p2.y-p3.y)*t2+(-p0.y+3*p1.y-3*p2.y+p3.y)*t3)
-      ));
+        (t2-t)/(t2-t1)*b1x+(t-t1)/(t2-t1)*b2x,
+        (t2-t)/(t2-t1)*b1y+(t-t1)/(t2-t1)*b2y));
     }
   }
   out.push(out[0].clone());
@@ -446,24 +466,36 @@ class Race extends Phaser.Scene {
       .forEach(([x,y,c])=>{ this.add.image(x,y,'glow').setScale(12).setTint(c).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1); });
   }
 
-  // ---- countdown then go ----
+  // ---- track intro splash, then countdown, then go ----
   beginRace() {
     this.applySkins();
     this.resetState();
-    Sound.init(); Sound.startEngine(); Sound.setEngine(0.15); Sound.startMusic(Sound.MUSIC.drift);
-    const el=document.getElementById('count'), span=el.querySelector('span');
-    el.style.display='flex';
-    const seq=['3','2','1','GO!'];
-    let i=0;
-    const step=()=>{
-      span.textContent=seq[i];
-      span.style.color = seq[i]==='GO!' ? '#2bff9e' : '#ffd23d';
-      if (seq[i]==='GO!') Sound.goTone(); else Sound.countTone();
-      i++;
-      if (i<seq.length){ this.time.delayedCall(820, step); }
-      else { this.time.delayedCall(620, ()=>{ el.style.display='none'; this.startTimers(); }); }
+    Sound.init(); Sound.startEngine(); Sound.setEngine(0.12); Sound.startTrack('../../vendor/music/drift-running.mp3', 0.7, Sound.MUSIC.drift);
+
+    const tk = TRACKS[GAME.track];
+    const intro = document.getElementById('intro');
+    document.getElementById('introFlag').textContent = tk.flag;
+    document.getElementById('introName').textContent = (GAME.mode==='circuit' ? 'ROUND '+(GAME.track+1)+' · ' : '') + tk.name;
+    document.getElementById('introTag').textContent = tk.tag;
+    intro.style.display='flex'; requestAnimationFrame(()=>intro.classList.add('show'));
+    Sound.beep(880);
+
+    const startCountdown = () => {
+      intro.classList.remove('show'); intro.style.display='none';
+      const el=document.getElementById('count'), span=el.querySelector('span');
+      el.style.display='flex';
+      const seq=['3','2','1','GO!']; let i=0;
+      const step=()=>{
+        span.textContent=seq[i];
+        span.style.color = seq[i]==='GO!' ? '#2bff9e' : '#ffd23d';
+        if (seq[i]==='GO!') Sound.goTone(); else Sound.countTone();
+        i++;
+        if (i<seq.length){ this.time.delayedCall(820, step); }
+        else { this.time.delayedCall(620, ()=>{ el.style.display='none'; this.startTimers(); }); }
+      };
+      step();
     };
-    step();
+    this.time.delayedCall(2000, startCountdown);
   }
   startTimers() {
     this.running=true; this.finished=false;
@@ -689,8 +721,9 @@ document.getElementById('saveScore').addEventListener('click', ()=>{
 
 // ---- track picker (used for time attack) ----
 function updateTrackPick(){
-  const rec=Number(localStorage.getItem(recKey(GAME.track))||0);
-  document.getElementById('trackName').innerHTML = TRACKS[GAME.track].name + ' <small>'+(GAME.track+1)+' / '+TRACKS.length+(rec?' · REC '+(rec/1000).toFixed(2):'')+'</small>';
+  const t=TRACKS[GAME.track], rec=Number(localStorage.getItem(recKey(GAME.track))||0);
+  document.getElementById('trackName').innerHTML = t.flag+' '+t.name + ' <small>'+(GAME.track+1)+' / '+TRACKS.length+(rec?' · REC '+(rec/1000).toFixed(2):'')+'</small>';
+  document.getElementById('trackTag').textContent = t.tag;
 }
 function buildTrackPicker(){
   const el=document.getElementById('trackpick');
