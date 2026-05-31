@@ -21,6 +21,7 @@ Two browser racing games, built end-to-end with Claude Code — an experiment in
 ## Credits
 
 - 3D car models: **Kenney** — Car Kit (CC0 / public domain), kenney.nl.
+- Neon Rush soundtrack: "The Mountain — Night Drive" via **Pixabay** (royalty-free, no attribution required); normalised/level-balanced against the engine. Neon Drift uses the in-code procedural soundtrack.
 
 ## Controls
 

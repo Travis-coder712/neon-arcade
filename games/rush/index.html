@@ -290,7 +290,7 @@ function crash(){ state.running=false; if(window.Sound){Sound.crash();Sound.stop
   if(q){ const inp=document.getElementById('initInput'); inp.value=(localStorage.getItem('neonArcadeName')||'YOU'); setTimeout(()=>{inp.focus();inp.select();},50); }
   document.getElementById('over').style.display='flex'; }
 
-function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();Sound.startMusic(Sound.MUSIC.rush);}
+function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();Sound.startTrack('../../vendor/music/rush-nightdrive.mp3', 0.7, Sound.MUSIC.rush);}
   state.running=true;state.score=0;state.speed=state.baseSpeed;state.targetLane=1;state.invuln=1.2;state.nextMarker=500;
   player.position.set(0,0,4);player.visible=true;
   traffic.forEach((t,i)=>resetTraffic(t,-60-i*28));

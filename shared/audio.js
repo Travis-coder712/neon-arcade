@@ -63,8 +63,8 @@
       this._engine.o2.frequency.setTargetAtTime(f * 0.5, t, 0.04);
       this._engine.o3.frequency.setTargetAtTime(f * 2.01, t, 0.05);
       this._engine.lp.frequency.setTargetAtTime(600 + s * 2800, t, 0.08);
-      this._engine.g.gain.setTargetAtTime(0.04 + s * 0.05, t, 0.1);
-      this._engine.ng.gain.setTargetAtTime(0.02 + s * 0.055, t, 0.1);
+      this._engine.g.gain.setTargetAtTime(0.045 + s * 0.045, t, 0.1);  // balanced to sit alongside the music track
+      this._engine.ng.gain.setTargetAtTime(0.02 + s * 0.045, t, 0.1);
       this._engine.nlp.frequency.setTargetAtTime(240 + s * 520, t, 0.1);
     },
     stopEngine() {
@@ -155,10 +155,30 @@
     },
     stopMusic(silent) {
       if (this._musicTimer) { clearInterval(this._musicTimer); this._musicTimer = null; }
+      if (this._trackEl) { try { this._trackEl.pause(); } catch (e) {} }
       if (this._musicGain && !silent) this._musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
     },
     setMusicMuted(m) { this.musicMuted = m; if (this._musicGain) this._musicGain.gain.setTargetAtTime(m ? 0 : (this._mcfg ? this._mcfg.vol : 0.42), this.ctx.currentTime, 0.2); },
-    isPlayingMusic() { return !!this._musicTimer; },
+    isPlayingMusic() { return !!this._musicTimer || (this._trackEl && !this._trackEl.paused); },
+
+    // play a real audio file as the soundtrack (routed through musicGain → master,
+    // so the music toggle and master mute both apply). Falls back to procedural on error.
+    startTrack(url, vol, fallbackCfg) {
+      if (!this.ctx) return;
+      this.stopMusic(true);
+      if (!this._trackEl) {
+        this._trackEl = new Audio(); this._trackEl.loop = true; this._trackEl.preload = 'auto';
+        try { this._trackSrc = this.ctx.createMediaElementSource(this._trackEl); this._trackSrc.connect(this._musicGain); } catch (e) {}
+      }
+      this._mfallback = fallbackCfg || null;
+      this._trackEl.onerror = () => { if (this._mfallback) this.startMusic(this._mfallback); };
+      this._mcfg = { vol: vol };
+      if (this._trackUrl !== url) { this._trackUrl = url; this._trackEl.src = url; }
+      this._musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this._musicGain.gain.setTargetAtTime(this.musicMuted ? 0 : vol, this.ctx.currentTime, 0.5);
+      try { this._trackEl.currentTime = 0; } catch (e) {}
+      const p = this._trackEl.play(); if (p && p.catch) p.catch(() => { if (this._mfallback) this.startMusic(this._mfallback); });
+    },
     _schedule() {
       const cfg = this._mcfg, stepDur = 60 / cfg.bpm / 4;
       while (this._nextNoteTime < this.ctx.currentTime + 0.2) { this._playStep(this._step, this._nextNoteTime, cfg, stepDur); this._nextNoteTime += stepDur; this._step++; }
