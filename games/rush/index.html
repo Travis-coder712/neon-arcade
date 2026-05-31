@@ -35,6 +35,11 @@
   .iconbtn { width:36px; height:36px; border-radius:9px; font-size:16px; background:rgba(30,8,55,.5); border:1px solid rgba(255,61,240,.35); color:#ffb3f6; }
   .iconbtn.off { opacity:.4; }
   .play:disabled { opacity:.55; filter:grayscale(.4); }
+  #envname { position:fixed; top:18%; left:0; right:0; text-align:center; z-index:12; pointer-events:none;
+             font-size:9vw; font-style:italic; font-weight:bold; letter-spacing:4px; color:#fff;
+             text-shadow:0 0 22px rgba(255,255,255,.7); opacity:0; transform:scale(.8); }
+  #envname.show { animation:envflash 2.4s ease-out forwards; }
+  @keyframes envflash { 0%{opacity:0;transform:scale(.8);} 12%{opacity:1;transform:scale(1);} 70%{opacity:1;} 100%{opacity:0;transform:scale(1.05);} }
   /* car picker */
   .carpick-label { font-size:11px; letter-spacing:2px; color:#9fe9ff; opacity:.8; }
   .carpick { display:flex; align-items:center; gap:14px; justify-content:center; }
@@ -71,6 +76,7 @@
   <div class="panel"><div class="label">SCORE</div><div class="value" id="score">0</div></div>
   <div class="panel" id="bestP"><div class="label">BEST</div><div class="value" id="best">0</div></div>
 </div>
+<div id="envname"></div>
 <div id="controls"><div class="btn" id="left">◄</div><div class="btn" id="right">►</div></div>
 
 <div class="overlay" id="title">
@@ -113,23 +119,53 @@ scene.add(new THREE.HemisphereLight(0xff66ff, 0x2200ff, 0.9));
 const key=new THREE.DirectionalLight(0xffffff,1.1); key.position.set(-6,14,6); scene.add(key);
 const rim=new THREE.PointLight(0x00f0ff,1.2,60); rim.position.set(0,8,14); scene.add(rim);
 
-function makeSunTexture(){ const c=document.createElement('canvas'); c.width=512;c.height=512; const x=c.getContext('2d');
-  const g=x.createLinearGradient(0,0,0,512); g.addColorStop(0,'#ffe14d'); g.addColorStop(.5,'#ff5fa8'); g.addColorStop(1,'#ff2d95');
+// ===== environment palettes — cycle every 1500 pts; sun rises/sets at each change =====
+const ENVS = [
+  { name:'MIAMI',    sky:['#1a0636','#3a0f63','#8a1f7a'], sun:['#ffe14d','#ff5fa8','#ff2d95'], grid:'#00f0ff', gridBg:'#160a2e', edgeA:0x00f0ff, edgeB:0xff3df0, pylon:0x00f0ff, fog:0x2a0a4a },
+  { name:'VAPOR',    sky:['#04243a','#0a4a5a','#22a0a0'], sun:['#eafdff','#7df9ff','#19e0ff'], grid:'#19e0ff', gridBg:'#06222e', edgeA:0x19e0ff, edgeB:0xff3df0, pylon:0x19e0ff, fog:0x0a2a3a },
+  { name:'INFERNO',  sky:['#2a0606','#5a1410','#c84418'], sun:['#fff0b0','#ff8a3d','#ff3b1a'], grid:'#ff7a3d', gridBg:'#240a08', edgeA:0xff7a3d, edgeB:0xffd23d, pylon:0xff5a2a, fog:0x3a0c06 },
+  { name:'EMERALD',  sky:['#04200f','#0a4a22','#1f9a52'], sun:['#f0ff9a','#9bff6a','#2bff9e'], grid:'#2bff9e', gridBg:'#06200f', edgeA:0x2bff9e, edgeB:0x19e0ff, pylon:0x2bff9e, fog:0x0a2a16 },
+  { name:'MIDNIGHT', sky:['#03081f','#0a1a4a','#2f4aa0'], sun:['#eaf2ff','#9fd0ff','#5a8aff'], grid:'#5a8aff', gridBg:'#06102a', edgeA:0x5a8aff, edgeB:0x9fd0ff, pylon:0x5a8aff, fog:0x05102a },
+  { name:'CANDY',    sky:['#2a0628','#6a1258','#d83a96'], sun:['#fff0c8','#ff9bd4','#ff5fb0'], grid:'#ff3df0', gridBg:'#240a22', edgeA:0xff3df0, edgeB:0xffd23d, pylon:0xff6ad0, fog:0x2a0a28 }
+];
+
+// sun (repaintable)
+const sunCanvas=document.createElement('canvas'); sunCanvas.width=sunCanvas.height=512; const sunCtx=sunCanvas.getContext('2d');
+const sunTex=new THREE.CanvasTexture(sunCanvas);
+function paintSun(env){ const x=sunCtx; x.globalCompositeOperation='source-over'; x.clearRect(0,0,512,512);
+  const g=x.createLinearGradient(0,0,0,512); g.addColorStop(0,env.sun[0]); g.addColorStop(.5,env.sun[1]); g.addColorStop(1,env.sun[2]);
   x.fillStyle=g; x.beginPath(); x.arc(256,256,250,0,Math.PI*2); x.fill();
-  x.globalCompositeOperation='destination-out'; for(let i=0;i<11;i++){const h=4+i*2;const y=300+i*22;x.fillRect(0,y,512,h);} return new THREE.CanvasTexture(c); }
-const sun=new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({map:makeSunTexture(),transparent:true,fog:false})); sun.position.set(0,22,-240); scene.add(sun);
+  x.globalCompositeOperation='destination-out'; for(let i=0;i<11;i++){const h=4+i*2;const y=300+i*22;x.fillRect(0,y,512,h);} x.globalCompositeOperation='source-over'; sunTex.needsUpdate=true; }
+const sun=new THREE.Mesh(new THREE.PlaneGeometry(80,80), new THREE.MeshBasicMaterial({map:sunTex,transparent:true,fog:false})); sun.position.set(0,22,-240); scene.add(sun);
 
-const sky=new THREE.Mesh(new THREE.PlaneGeometry(900,400),(()=>{const c=document.createElement('canvas');c.width=4;c.height=256;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#1a0636');g.addColorStop(.6,'#3a0f63');g.addColorStop(1,'#8a1f7a');x.fillStyle=g;x.fillRect(0,0,4,256);return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),fog:false,depthWrite:false});})()); sky.position.set(0,40,-300); scene.add(sky);
+// sky (repaintable gradient)
+const skyCanvas=document.createElement('canvas'); skyCanvas.width=4; skyCanvas.height=256; const skyCtx=skyCanvas.getContext('2d');
+const skyTex=new THREE.CanvasTexture(skyCanvas);
+function paintSky(env){ const x=skyCtx; const g=x.createLinearGradient(0,0,0,256); g.addColorStop(0,env.sky[0]); g.addColorStop(.6,env.sky[1]); g.addColorStop(1,env.sky[2]); x.fillStyle=g; x.fillRect(0,0,4,256); skyTex.needsUpdate=true; }
+const sky=new THREE.Mesh(new THREE.PlaneGeometry(900,400), new THREE.MeshBasicMaterial({map:skyTex,fog:false,depthWrite:false})); sky.position.set(0,40,-300); scene.add(sky);
 
-function makeGridTexture(){ const c=document.createElement('canvas');c.width=256;c.height=256;const x=c.getContext('2d');x.fillStyle='#160a2e';x.fillRect(0,0,256,256);x.strokeStyle='#00f0ff';x.lineWidth=3;x.shadowColor='#00f0ff';x.shadowBlur=6;for(let i=0;i<=256;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(14,40);return t; }
-const gridTex=makeGridTexture();
+// scrolling neon grid (repaintable)
+const gridCanvas=document.createElement('canvas'); gridCanvas.width=gridCanvas.height=256; const gridCtx=gridCanvas.getContext('2d');
+const gridTex=new THREE.CanvasTexture(gridCanvas); gridTex.wrapS=gridTex.wrapT=THREE.RepeatWrapping; gridTex.repeat.set(14,40);
+function paintGrid(env){ const x=gridCtx; x.fillStyle=env.gridBg; x.fillRect(0,0,256,256); x.strokeStyle=env.grid; x.lineWidth=3; x.shadowColor=env.grid; x.shadowBlur=6; for(let i=0;i<=256;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke();} x.shadowBlur=0; gridTex.needsUpdate=true; }
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,1200), new THREE.MeshBasicMaterial({map:gridTex})); ground.rotation.x=-Math.PI/2; ground.position.set(0,-0.05,-380); scene.add(ground);
 
 const ROAD_HALF=9;
 const road=new THREE.Mesh(new THREE.PlaneGeometry(ROAD_HALF*2,1200), new THREE.MeshStandardMaterial({color:0x0b0820,roughness:.55,metalness:.4})); road.rotation.x=-Math.PI/2; road.position.set(0,0,-380); scene.add(road);
 const LANES=[-6,0,6];
-function neonStrip(x,w,color){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,1200),new THREE.MeshBasicMaterial({color}));m.rotation.x=-Math.PI/2;m.position.set(x,0.02,-380);scene.add(m);}
-neonStrip(-3,0.18,0x00f0ff); neonStrip(3,0.18,0x00f0ff); neonStrip(-ROAD_HALF,0.3,0xff3df0); neonStrip(ROAD_HALF,0.3,0xff3df0);
+const laneStrips=[], railStrips=[];
+function neonStrip(x,w,color,arr){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,1200),new THREE.MeshBasicMaterial({color}));m.rotation.x=-Math.PI/2;m.position.set(x,0.02,-380);scene.add(m);arr.push(m);}
+neonStrip(-3,0.18,0x00f0ff,laneStrips); neonStrip(3,0.18,0x00f0ff,laneStrips); neonStrip(-ROAD_HALF,0.3,0xff3df0,railStrips); neonStrip(ROAD_HALF,0.3,0xff3df0,railStrips);
+
+const envFogDay=new THREE.Color(0x2a0a4a), envFogNight=new THREE.Color(0x07021a);
+function applyEnv(env){
+  paintSun(env); paintSky(env); paintGrid(env);
+  laneStrips.forEach(m=>m.material.color.setHex(env.edgeA));
+  railStrips.forEach(m=>m.material.color.setHex(env.edgeB));
+  if (typeof pylons!=='undefined') pylons.forEach(p=>p.material.emissive.setHex(env.pylon));
+  envFogDay.setHex(env.fog); envFogNight.copy(envFogDay).multiplyScalar(0.30);
+  const tag=document.getElementById('envname'); if(tag){ tag.textContent=env.name; tag.classList.remove('show'); void tag.offsetWidth; tag.classList.add('show'); }
+}
 
 // ===== Kenney Car Kit (CC0) — real low-poly 3D car models =====
 const CARS=[
@@ -188,6 +224,7 @@ function onCarsReady(){ carsReady=true; setPlayerCar(selectedCar);
   buildCarPicker(); }
 
 const pylons=[]; for(let i=0;i<26;i++){const side=i%2===0?-1:1;const p=new THREE.Mesh(new THREE.BoxGeometry(.4,3.4,.4),new THREE.MeshStandardMaterial({color:0x12203a,emissive:0x00f0ff,emissiveIntensity:.8}));p.position.set(side*(ROAD_HALF+1.6),1.7,-((i>>1)*18)-8);scene.add(p);pylons.push(p);}
+applyEnv(ENVS[0]);   // paint the starting environment now that everything exists
 
 // ---- stars ----
 (()=>{ const N=240, g=new THREE.BufferGeometry(), pos=new Float32Array(N*3);
@@ -230,10 +267,8 @@ function spawnMarker(score){
   g.position.set(0,0,-200); scene.add(g); markers.push(g);
 }
 // ---- day/night sun transition at 3000 ----
-const FOG_DAY=new THREE.Color(0x2a0a4a), FOG_NIGHT=new THREE.Color(0x07021a);
-let sunSet=false, sunProg=0;
-
-const state={running:false,speed:0,baseSpeed:55,score:0,best:Number(localStorage.getItem('neonRushBest')||0),targetLane:1,invuln:0,nextMarker:500};
+const state={running:false,speed:0,baseSpeed:55,score:0,best:Number(localStorage.getItem('neonRushBest')||0),targetLane:1,invuln:0,nextMarker:500,
+  nextEnv:1500, envIndex:0, sunUp:true, trans:null};
 document.getElementById('best').textContent=state.best;
 function shift(dir){ if(!state.running)return; state.targetLane=Math.max(0,Math.min(2,state.targetLane+dir)); }
 
@@ -258,9 +293,20 @@ function animate(){ requestAnimationFrame(animate); const dt=Math.min(clock.getD
     // milestone gate every 500 pts
     if(state.score>=state.nextMarker){ spawnMarker(state.nextMarker); state.nextMarker+=500; }
     for(let i=markers.length-1;i>=0;i--){ markers[i].position.z+=move; if(markers[i].position.z>16){ scene.remove(markers[i]); markers.splice(i,1); } }
-    // sun sets into night at 3000
-    if(state.score>=3000) sunSet=true;
-    if(sunSet && sunProg<1){ sunProg=Math.min(1,sunProg+dt/6); sun.position.y=22-46*sunProg; scene.fog.color.lerpColors(FOG_DAY,FOG_NIGHT,sunProg); }
+    // every 1500 pts: shift to the next environment palette + sun rises or sets
+    if(state.score>=state.nextEnv){ state.nextEnv+=1500; state.envIndex=(state.envIndex+1)%ENVS.length; state.sunUp=!state.sunUp;
+      state.trans={ start:sun.position.y, target: state.sunUp?24:-30, t:0, applied: state.sunUp };
+      if(state.sunUp) applyEnv(ENVS[state.envIndex]);   // sunrise: swap palette while dark, then rise into it
+      if(window.Sound) Sound.whoosh();
+    }
+    if(state.trans){ const tr=state.trans; tr.t=Math.min(1, tr.t+dt/5);
+      const e = tr.t<.5 ? 2*tr.t*tr.t : 1-Math.pow(-2*tr.t+2,2)/2;
+      sun.position.y = tr.start + (tr.target-tr.start)*e;
+      if(!tr.applied && sun.position.y<-1){ applyEnv(ENVS[state.envIndex]); tr.applied=true; }  // sunset: swap once hidden
+      if(tr.t>=1){ if(!tr.applied) applyEnv(ENVS[state.envIndex]); state.trans=null; }
+    }
+    // fog tracks sun height — darker when the sun is low
+    scene.fog.color.lerpColors(envFogNight, envFogDay, Math.max(0,Math.min(1, sun.position.y/22)));
     if(state.invuln>0){state.invuln-=dt;player.visible=(Math.floor(clock.elapsedTime*20)%2===0);} else player.visible=true;
     document.getElementById('speed').textContent=Math.round(state.speed*2.4);
     document.getElementById('score').textContent=Math.floor(state.score);
@@ -295,7 +341,7 @@ function startGame(){ if(window.Sound){Sound.init();Sound.startEngine();Sound.st
   player.position.set(0,0,4);player.visible=true;
   traffic.forEach((t,i)=>resetTraffic(t,-60-i*28));
   for(const m of markers) scene.remove(m); markers.length=0;
-  sunSet=false; sunProg=0; sun.position.y=22; scene.fog.color.copy(FOG_DAY);
+  state.nextEnv=1500; state.envIndex=0; state.sunUp=true; state.trans=null; sun.position.y=22; applyEnv(ENVS[0]);
   document.getElementById('title').style.display='none'; document.getElementById('over').style.display='none'; }
 
 function bindBtn(id,dir){const el=document.getElementById(id);const fire=e=>{e.preventDefault();shift(dir);el.classList.add('held');setTimeout(()=>el.classList.remove('held'),120);};el.addEventListener('touchstart',fire,{passive:false});el.addEventListener('mousedown',fire);}
