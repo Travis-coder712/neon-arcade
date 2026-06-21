@@ -1,5 +1,5 @@
 /* Neon Arcade service worker — cache-first offline support */
-const CACHE = 'neon-arcade-v11';
+const CACHE = 'neon-arcade-v12';
 const ASSETS = [
   './',
   './index.html',

@@ -517,7 +517,7 @@ class GameScene extends Phaser.Scene {
     // Bullet groups
     this.playerBullets = this.physics.add.group({ maxSize: 60, classType: Phaser.Physics.Arcade.Sprite });
     this.enemyBullets = this.physics.add.group({ maxSize: 100, classType: Phaser.Physics.Arcade.Sprite });
-    this.enemies = this.physics.add.group({ maxSize: 40 });
+    this.enemies = this.physics.add.group({ maxSize: 60 });
     this.powerups = this.physics.add.group({ maxSize: 10 });
 
     // State
@@ -819,7 +819,12 @@ class GameScene extends Phaser.Scene {
 
   spawnMiniBoss() {
     this.bossAlive = true;
+    // Clear stragglers
+    this.enemies.children.each(e => {
+      if (e.active && e.getData('type') !== 'boss' && e.getData('type') !== 'miniboss') e.destroy();
+    });
     const mb = this.enemies.create(W/2, -60, 'miniboss');
+    if (!mb) { this.bossAlive = false; return; }
     mb.setDepth(8);
     mb.setData('type', 'miniboss');
     mb.setData('hp', 20);
@@ -871,12 +876,20 @@ class GameScene extends Phaser.Scene {
     this.bossHP = 50;
     this.bossPhase = 1;
 
+    // Clear any remaining enemies to make room in the pool
+    this.enemies.children.each(e => {
+      if (e.active && e.getData('type') !== 'boss' && e.getData('type') !== 'miniboss') {
+        e.destroy();
+      }
+    });
+
     this.boss = this.enemies.create(W/2, -100, 'boss');
+    if (!this.boss) { this.bossAlive = false; return; }
     this.boss.setDepth(8);
     this.boss.setData('type', 'boss');
     this.boss.setData('hp', this.bossHP);
     this.boss.setData('score', 5000);
-    this.boss.setData('canShoot', false); // handled by updateBoss
+    this.boss.setData('canShoot', false);
 
     // Entrance
     this.tweens.add({
