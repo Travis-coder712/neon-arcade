@@ -748,9 +748,29 @@ class GameScene extends Phaser.Scene {
       if (this.comboTimer <= 0) { this.combo = 1; this.updateHUD(); }
     }
 
-    // Wave spawning
+    // Kill enemies that flew off screen (all types except boss/miniboss)
+    this.enemies.children.each(e => {
+      if (!e.active) return;
+      const t = e.getData('type');
+      if (t !== 'boss' && t !== 'miniboss' && (e.y > H + 60 || e.y < -80 || e.x < -60 || e.x > W + 60)) {
+        e.destroy();
+      }
+    });
+
+    // Wave spawning — with stall timeout
     this.waveTimer -= delta;
-    if (this.waveTimer <= 0 && !this.bossAlive && this.enemies.countActive() === 0) {
+    const activeCount = this.enemies.countActive();
+    if (activeCount === 0 && !this.bossAlive) {
+      this.stallTimer = (this.stallTimer || 0) + delta;
+    } else {
+      this.stallTimer = 0;
+    }
+    if (this.waveTimer <= 0 && !this.bossAlive && (activeCount === 0 || this.stallTimer > 4000)) {
+      if (this.stallTimer > 4000) {
+        // Force-clear stuck enemies
+        this.enemies.children.each(e => { if (e.active) e.destroy(); });
+      }
+      this.stallTimer = 0;
       this.spawnWave();
     }
 
