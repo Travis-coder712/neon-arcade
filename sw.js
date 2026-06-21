@@ -1,5 +1,5 @@
 /* Neon Arcade service worker — cache-first offline support */
-const CACHE = 'neon-arcade-v9';
+const CACHE = 'neon-arcade-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const ASSETS = [
   './games/rush/index.html',
   './games/pong/index.html',
   './games/pacman/index.html',
+  './games/striker/index.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png'
