@@ -332,17 +332,33 @@ const StrikerMusic = {
 };
 
 function makeBullet(scene, key, color, w, h) {
+  const cw = w * 3, ch = h * 2;
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = cw; c.height = ch;
   const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(0.3, color);
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grad;
+  // Outer glow
+  const glow = g.createRadialGradient(cw/2, ch/3, 0, cw/2, ch/3, cw/2);
+  glow.addColorStop(0, color);
+  glow.addColorStop(0.5, color + '66');
+  glow.addColorStop(1, 'transparent');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, cw, ch);
+  // Bright core
+  const core = g.createLinearGradient(0, 0, 0, ch);
+  core.addColorStop(0, '#ffffff');
+  core.addColorStop(0.2, '#ffffff');
+  core.addColorStop(0.5, color);
+  core.addColorStop(1, 'transparent');
+  g.fillStyle = core;
   g.beginPath();
-  g.ellipse(w/2, h/3, w/2, h/2, 0, 0, Math.PI*2);
+  g.ellipse(cw/2, ch/3, w/2 + 1, h/2 + 2, 0, 0, Math.PI*2);
   g.fill();
+  // Trail streak
+  const trail = g.createLinearGradient(0, ch/3, 0, ch);
+  trail.addColorStop(0, color + 'aa');
+  trail.addColorStop(1, 'transparent');
+  g.fillStyle = trail;
+  g.fillRect(cw/2 - 1.5, ch/3, 3, ch * 0.6);
   scene.textures.addCanvas(key, c);
 }
 
@@ -387,7 +403,7 @@ function makeStarfield(scene) {
       const x = Math.random() * W;
       const y = Math.random() * H;
       const r = Math.random() * maxSize + 0.5;
-      const a = Math.random() * 0.6 + 0.4;
+      const a = Math.random() * 0.4 + 0.15;
       // Color variation
       const colors = ['#ffffff', '#aaccff', '#ffddaa', '#ddddff'];
       g.fillStyle = colors[Math.floor(Math.random() * colors.length)];
@@ -461,9 +477,9 @@ class GameScene extends Phaser.Scene {
     makeEnemyShip(this, 'enemy_scout', '#cc33cc', '#ff66ff', 'scout');
     makeBossShip(this);
     makeMiniBoss(this);
-    makeBullet(this, 'bullet_player', '#ffdd00', 6, 16);
-    makeBullet(this, 'bullet_enemy', '#ff4444', 5, 12);
-    makeBullet(this, 'bullet_boss', '#ff0066', 8, 14);
+    makeBullet(this, 'bullet_player', '#00ffcc', 8, 20);
+    makeBullet(this, 'bullet_enemy', '#ff2222', 7, 16);
+    makeBullet(this, 'bullet_boss', '#ff0066', 10, 18);
     makeParticle(this, 'particle_fire', '#ff8844');
     makeParticle(this, 'particle_blue', '#4488ff');
     makeParticle(this, 'particle_white', '#ffffff');
@@ -591,10 +607,10 @@ class GameScene extends Phaser.Scene {
       this.cameras.main.postFX.addVignette(0.5, 0.5, 0.9);
     }
 
-    // Audio init + music
+    // Audio init + music (continue from title if already playing)
     if (window.Sound) {
       Sound.init();
-      StrikerMusic.start(Sound.ctx, Sound.master);
+      if (!StrikerMusic.playing) StrikerMusic.start(Sound.ctx, Sound.master);
     }
 
     // Environment name flash
@@ -669,18 +685,30 @@ class GameScene extends Phaser.Scene {
     if (this.spreadLevel >= 2) { fire(-8, -95); fire(8, -85); }
     if (this.spreadLevel >= 3) { fire(-14, -100); fire(14, -80); }
 
-    // SFX
+    // Laser SFX — punchy "pow" with resonance
     if (window.Sound && Sound.ctx) {
       const c = Sound.ctx, t = c.currentTime;
-      const o = c.createOscillator();
-      o.type = 'square';
-      o.frequency.setValueAtTime(880 + Math.random() * 200, t);
-      o.frequency.exponentialRampToValueAtTime(220, t + 0.06);
+      // Tone sweep
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(1200 + Math.random() * 300, t);
+      o.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+      // Resonant filter for "pew" character
+      const f = c.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.setValueAtTime(1800, t); f.Q.value = 5;
+      f.frequency.exponentialRampToValueAtTime(600, t + 0.08);
       const g = c.createGain();
-      g.gain.setValueAtTime(0.08, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-      o.connect(g).connect(Sound.master);
-      o.start(t); o.stop(t + 0.06);
+      g.gain.setValueAtTime(0.07, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      o.connect(f).connect(g).connect(Sound.master);
+      o.start(t); o.stop(t + 0.1);
+      // Click transient for punch
+      const click = c.createOscillator(); click.type = 'sine';
+      click.frequency.setValueAtTime(3000, t);
+      const cg = c.createGain();
+      cg.gain.setValueAtTime(0.05, t);
+      cg.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
+      click.connect(cg).connect(Sound.master);
+      click.start(t); click.stop(t + 0.015);
     }
   }
 
@@ -1008,20 +1036,42 @@ class GameScene extends Phaser.Scene {
 
     this.updateHUD();
 
-    // Explosion SFX
+    // Explosion SFX — layered bass thump + filtered noise + crackle
     if (window.Sound && Sound.ctx) {
       const c = Sound.ctx, t = c.currentTime;
+      const isBoss = enemy.getData('type') === 'boss' || enemy.getData('type') === 'miniboss';
+      const vol = isBoss ? 1.5 : 1;
+      const dur = isBoss ? 0.5 : 0.3;
+      // Bass thump
+      const bass = c.createOscillator(); bass.type = 'sine';
+      bass.frequency.setValueAtTime(isBoss ? 80 : 120, t);
+      bass.frequency.exponentialRampToValueAtTime(20, t + dur);
+      const bg = c.createGain();
+      bg.gain.setValueAtTime(0.15 * vol, t);
+      bg.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      bass.connect(bg).connect(Sound.master);
+      bass.start(t); bass.stop(t + dur);
+      // Filtered noise burst
       const noise = c.createBufferSource();
       noise.buffer = Sound._noiseBuf;
-      const g = c.createGain();
-      g.gain.setValueAtTime(0.15, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-      const f = c.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.setValueAtTime(2000, t);
-      f.frequency.exponentialRampToValueAtTime(100, t + 0.2);
-      noise.connect(f).connect(g).connect(Sound.master);
-      noise.start(t); noise.stop(t + 0.2);
+      const nf = c.createBiquadFilter(); nf.type = 'bandpass';
+      nf.frequency.setValueAtTime(3000, t);
+      nf.frequency.exponentialRampToValueAtTime(200, t + dur * 0.8);
+      nf.Q.value = 1;
+      const ng = c.createGain();
+      ng.gain.setValueAtTime(0.12 * vol, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + dur * 0.7);
+      noise.connect(nf).connect(ng).connect(Sound.master);
+      noise.start(t); noise.stop(t + dur);
+      // High crackle
+      const crackle = c.createBufferSource();
+      crackle.buffer = Sound._noiseBuf;
+      const cf = c.createBiquadFilter(); cf.type = 'highpass'; cf.frequency.value = 6000;
+      const cg = c.createGain();
+      cg.gain.setValueAtTime(0.04 * vol, t);
+      cg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      crackle.connect(cf).connect(cg).connect(Sound.master);
+      crackle.start(t); crackle.stop(t + 0.12);
     }
   }
 
@@ -1209,8 +1259,18 @@ class TitleScene extends Phaser.Scene {
       backgroundColor: 'rgba(255,221,0,0.1)',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
+    // Start music on first touch anywhere (needed for iOS audio unlock)
+    this.input.once('pointerdown', () => {
+      if (window.Sound) {
+        Sound.init();
+        if (!StrikerMusic.playing) StrikerMusic.start(Sound.ctx, Sound.master);
+      }
+    });
+
     play.on('pointerdown', () => {
       if (window.Sound) Sound.init();
+      // Music continues from title into game — don't restart if already playing
+      if (!StrikerMusic.playing && Sound.ctx) StrikerMusic.start(Sound.ctx, Sound.master);
       this.scene.start('game');
     });
 
