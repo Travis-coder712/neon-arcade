@@ -66,6 +66,15 @@
   #pacman h2 { color:#ffe14d; text-shadow:0 0 16px rgba(255,225,77,.6); }
   #pacman .go { background:linear-gradient(90deg,#ffe14d,#fff0a8); color:#04061a; box-shadow:0 0 18px rgba(255,225,77,.5); }
 
+  /* Striker card — cinematic blue */
+  #striker { box-shadow:0 0 30px rgba(68,136,204,.3); border:1px solid rgba(68,136,204,.5); }
+  #striker .art { background:
+      radial-gradient(circle at 50% 30%, rgba(68,136,204,.5), transparent 50%),
+      radial-gradient(circle at 30% 70%, rgba(255,100,34,.25), transparent 40%),
+      linear-gradient(160deg,#081828,#020818 75%); }
+  #striker h2 { color:#88ccff; text-shadow:0 0 16px rgba(68,136,204,.8); }
+  #striker .go { background:linear-gradient(90deg,#4488cc,#88ccff); color:#020818; box-shadow:0 0 18px rgba(68,136,204,.6); }
+
   /* mini neon grid art inside cards */
   .grid { position:absolute; inset:0; z-index:0; opacity:.5;
     background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);
@@ -81,9 +90,17 @@
 <body>
   <div class="badge">★ IN DEVELOPMENT ★</div>
   <h1>NEON ARCADE</h1>
-  <div class="tagline">Four games, built end-to-end by Claude. Tap to play.</div>
+  <div class="tagline">Five games, built end-to-end by Claude. Tap to play.</div>
 
   <div class="cards">
+    <a class="card" id="striker" href="games/striker/index.html">
+      <div class="art"></div>
+      <div class="meta">
+        <h2>STRIKER</h2>
+        <div class="desc">Vertical space shooter. 15 waves, multi-phase boss, power-ups, combo scoring.</div>
+        <span class="go">PLAY ▶</span>
+      </div>
+    </a>
     <a class="card" id="drift" href="games/drift/index.html">
       <div class="art"></div><div class="grid"></div>
       <div class="meta">
