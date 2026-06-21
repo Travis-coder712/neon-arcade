@@ -548,7 +548,7 @@ class GameScene extends Phaser.Scene {
       fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#ff4444',
     }).setDepth(20);
 
-    this.comboText = this.add.text(W - 16, 20, '', {
+    this.comboText = this.add.text(W - 16, 48, '', {
       fontFamily: 'system-ui, sans-serif', fontSize: '14px', fontStyle: 'bold',
       color: '#ffdd00', align: 'right',
     }).setOrigin(1, 0).setDepth(20);
@@ -559,6 +559,32 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(20).setAlpha(0);
 
     this.updateHUD();
+
+    // Restart button (top-right corner)
+    this.restartBtn = this.add.text(W - 16, 20, '↺', {
+      fontFamily: 'system-ui', fontSize: '22px', color: '#556677',
+      padding: { x: 6, y: 2 },
+    }).setOrigin(1, 0).setDepth(25).setInteractive({ useHandCursor: true });
+    this.restartBtn.on('pointerdown', (p) => {
+      p.event.stopPropagation();
+      StrikerMusic.stop();
+      this.scene.start('title');
+    });
+    this.restartBtn.on('pointerover', () => this.restartBtn.setColor('#88aacc'));
+    this.restartBtn.on('pointerout', () => this.restartBtn.setColor('#556677'));
+
+    // Home button (next to restart)
+    this.homeBtn = this.add.text(W - 50, 20, '⌂', {
+      fontFamily: 'system-ui', fontSize: '22px', color: '#556677',
+      padding: { x: 6, y: 2 },
+    }).setOrigin(1, 0).setDepth(25).setInteractive({ useHandCursor: true });
+    this.homeBtn.on('pointerdown', (p) => {
+      p.event.stopPropagation();
+      StrikerMusic.stop();
+      window.location.href = '../../index.html';
+    });
+    this.homeBtn.on('pointerover', () => this.homeBtn.setColor('#88aacc'));
+    this.homeBtn.on('pointerout', () => this.homeBtn.setColor('#556677'));
 
     // Camera FX
     if (this.cameras.main.postFX) {
