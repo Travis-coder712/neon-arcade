@@ -206,6 +206,131 @@ function makeBossShip(scene) {
   scene.textures.addCanvas('boss', c);
 }
 
+function makeMiniBoss(scene) {
+  const s = 96, c = document.createElement('canvas');
+  c.width = s; c.height = s;
+  const g = c.getContext('2d');
+  g.translate(s/2, s/2);
+  const grad = g.createLinearGradient(-30, -30, 30, 30);
+  grad.addColorStop(0, '#886622');
+  grad.addColorStop(0.3, '#ccaa44');
+  grad.addColorStop(0.5, '#ffdd66');
+  grad.addColorStop(0.7, '#ccaa44');
+  grad.addColorStop(1, '#664411');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(0, 36); g.lineTo(24, 18); g.lineTo(40, 0);
+  g.lineTo(36, -20); g.lineTo(16, -34); g.lineTo(0, -38);
+  g.lineTo(-16, -34); g.lineTo(-36, -20); g.lineTo(-40, 0);
+  g.lineTo(-24, 18);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.1)'; g.lineWidth = 0.8; g.stroke();
+  // Cannons
+  g.fillStyle = '#554422';
+  g.fillRect(-36, -4, 10, 8); g.fillRect(26, -4, 10, 8);
+  // Core
+  const core = g.createRadialGradient(0, -4, 1, 0, -4, 12);
+  core.addColorStop(0, '#ffffff'); core.addColorStop(0.4, '#ffaa00'); core.addColorStop(1, '#663300');
+  g.fillStyle = core;
+  g.beginPath(); g.arc(0, -4, 12, 0, Math.PI*2); g.fill();
+  // Engines
+  g.fillStyle = '#ff8800';
+  g.beginPath(); g.arc(-14, -32, 4, 0, Math.PI*2); g.fill();
+  g.beginPath(); g.arc(14, -32, 4, 0, Math.PI*2); g.fill();
+  scene.textures.addCanvas('miniboss', c);
+}
+
+// ======= PROCEDURAL MUSIC ENGINE =======
+const StrikerMusic = {
+  ctx: null, master: null, playing: false,
+  nodes: [],
+
+  start(audioCtx, masterGain) {
+    if (this.playing) return;
+    this.ctx = audioCtx; this.master = masterGain; this.playing = true;
+
+    // Kick drum loop
+    const kickLoop = () => {
+      if (!this.playing) return;
+      const c = this.ctx, t = c.currentTime;
+      const o = c.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(30, t + 0.12);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      o.connect(g).connect(this.master);
+      o.start(t); o.stop(t + 0.15);
+    };
+
+    // Bass synth arpeggio
+    const bassNotes = [55, 65.4, 73.4, 82.4, 73.4, 65.4]; // Am arpeggio
+    let bassIdx = 0;
+    const bassLoop = () => {
+      if (!this.playing) return;
+      const c = this.ctx, t = c.currentTime;
+      const freq = bassNotes[bassIdx % bassNotes.length];
+      bassIdx++;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(freq, t);
+      const f = c.createBiquadFilter(); f.type = 'lowpass';
+      f.frequency.setValueAtTime(400, t);
+      f.frequency.exponentialRampToValueAtTime(150, t + 0.2);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.06, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.connect(f).connect(g).connect(this.master);
+      o.start(t); o.stop(t + 0.25);
+    };
+
+    // Pad — sustained atmospheric chord
+    const padFreqs = [220, 330, 440, 554]; // Am7 chord
+    padFreqs.forEach(freq => {
+      const c = this.ctx;
+      const o = c.createOscillator(); o.type = 'sine';
+      o.frequency.value = freq;
+      const g = c.createGain(); g.gain.value = 0.015;
+      o.connect(g).connect(this.master);
+      o.start();
+      this.nodes.push({ o, g });
+    });
+
+    // Hi-hat pattern
+    const hatLoop = () => {
+      if (!this.playing) return;
+      const c = this.ctx, t = c.currentTime;
+      const noise = c.createBufferSource();
+      const buf = c.createBuffer(1, c.sampleRate * 0.03, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      noise.buffer = buf;
+      const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 8000;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.04, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      noise.connect(f).connect(g).connect(this.master);
+      noise.start(t); noise.stop(t + 0.03);
+    };
+
+    // Schedule loops
+    const bpm = 130, beat = 60 / bpm;
+    this._kickId = setInterval(kickLoop, beat * 2 * 1000);
+    this._bassId = setInterval(bassLoop, beat * 1000);
+    this._hatId = setInterval(hatLoop, beat * 0.5 * 1000);
+    kickLoop(); bassLoop(); hatLoop();
+  },
+
+  stop() {
+    this.playing = false;
+    clearInterval(this._kickId);
+    clearInterval(this._bassId);
+    clearInterval(this._hatId);
+    this.nodes.forEach(n => { try { n.o.stop(); } catch(e) {} });
+    this.nodes = [];
+  }
+};
+
 function makeBullet(scene, key, color, w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -290,25 +415,36 @@ function makeStarfield(scene) {
 
 // ======= WAVE DEFINITIONS =======
 
+// Environment palettes — shift between acts
+const ENVS = [
+  { name:'DEEP SPACE', bg:0x020818, nebula:'240,60%', tint:0x88aacc },       // Act 1: blue
+  { name:'NEBULA',     bg:0x100818, nebula:'280,50%', tint:0xcc88dd },       // Act 2: purple
+  { name:'WARZONE',    bg:0x180808, nebula:'0,50%',   tint:0xdd8888 },       // Act 3: red
+];
+
 const WAVES = [
-  // Act 1 — intro
+  // Act 1 — intro (DEEP SPACE)
   { enemies: [{type:'fighter', count:3, formation:'line', delay:400}] },
   { enemies: [{type:'fighter', count:5, formation:'v', delay:300}] },
   { enemies: [{type:'fighter', count:4, formation:'line', delay:300}, {type:'bomber', count:2, formation:'line', delay:600}] },
   { enemies: [{type:'scout', count:6, formation:'scatter', delay:200}] },
   { enemies: [{type:'fighter', count:6, formation:'v', delay:250}] },
-  // Act 2 — escalation
+  // Mini-boss at end of Act 1
+  { miniBoss: true },
+  // Act 2 — escalation (NEBULA)
   { enemies: [{type:'bomber', count:4, formation:'line', delay:400}, {type:'fighter', count:4, formation:'v', delay:300}] },
   { enemies: [{type:'scout', count:8, formation:'scatter', delay:150}] },
   { enemies: [{type:'fighter', count:5, formation:'v', delay:200}, {type:'bomber', count:3, formation:'line', delay:500}] },
   { enemies: [{type:'bomber', count:5, formation:'v', delay:350}] },
   { enemies: [{type:'fighter', count:8, formation:'scatter', delay:150}, {type:'scout', count:4, formation:'line', delay:250}] },
-  // Act 3 — intense
+  // Mini-boss at end of Act 2
+  { miniBoss: true },
+  // Act 3 — intense (WARZONE)
   { enemies: [{type:'bomber', count:6, formation:'v', delay:300}, {type:'fighter', count:6, formation:'scatter', delay:200}] },
   { enemies: [{type:'scout', count:10, formation:'scatter', delay:120}] },
   { enemies: [{type:'fighter', count:8, formation:'v', delay:180}, {type:'bomber', count:4, formation:'v', delay:350}] },
   { enemies: [{type:'bomber', count:6, formation:'scatter', delay:250}, {type:'scout', count:6, formation:'scatter', delay:150}] },
-  // Boss wave
+  // Final Boss
   { boss: true },
 ];
 
@@ -324,6 +460,7 @@ class GameScene extends Phaser.Scene {
     makeEnemyShip(this, 'enemy_bomber', '#33cc33', '#66ff66', 'bomber');
     makeEnemyShip(this, 'enemy_scout', '#cc33cc', '#ff66ff', 'scout');
     makeBossShip(this);
+    makeMiniBoss(this);
     makeBullet(this, 'bullet_player', '#ffdd00', 6, 16);
     makeBullet(this, 'bullet_enemy', '#ff4444', 5, 12);
     makeBullet(this, 'bullet_boss', '#ff0066', 8, 14);
@@ -385,6 +522,8 @@ class GameScene extends Phaser.Scene {
     this.bossHP = 0;
     this.gameOver = false;
     this.invincible = false;
+    this.currentEnv = 0;
+    this.envOverlay = this.add.rectangle(W/2, H/2, W, H, 0x000000, 0).setDepth(1).setScrollFactor(0);
 
     // Touch / drag controls
     this.input.on('pointermove', (p) => {
@@ -426,8 +565,16 @@ class GameScene extends Phaser.Scene {
       this.cameras.main.postFX.addVignette(0.5, 0.5, 0.9);
     }
 
-    // Audio init
-    if (window.Sound) Sound.init();
+    // Audio init + music
+    if (window.Sound) {
+      Sound.init();
+      StrikerMusic.start(Sound.ctx, Sound.master);
+    }
+
+    // Environment name flash
+    this.envText = this.add.text(W/2, H/2 + 30, '', {
+      fontFamily: 'system-ui', fontSize: '14px', letterSpacing: 4, color: '#667788',
+    }).setOrigin(0.5).setDepth(20).setAlpha(0);
   }
 
   update(time, delta) {
@@ -461,6 +608,10 @@ class GameScene extends Phaser.Scene {
       if (!e.active) return;
       if (e.getData('type') === 'boss') {
         this.updateBoss(e, time);
+        return;
+      }
+      if (e.getData('type') === 'miniboss') {
+        this.updateMiniBoss(e, time);
         return;
       }
       // Move downward
@@ -538,8 +689,30 @@ class GameScene extends Phaser.Scene {
       yoyo: true, hold: 800,
     });
 
+    // Environment transition
+    const newEnv = this.waveIndex <= 6 ? 0 : this.waveIndex <= 12 ? 1 : 2;
+    if (newEnv !== this.currentEnv) {
+      this.currentEnv = newEnv;
+      const env = ENVS[newEnv];
+      // Tint overlay for atmosphere
+      this.tweens.add({
+        targets: this.envOverlay,
+        fillColor: env.bg,
+        fillAlpha: 0.3,
+        duration: 2000,
+      });
+      // Flash environment name
+      this.envText.setText(env.name);
+      this.tweens.add({ targets: this.envText, alpha: 0.8, duration: 500, yoyo: true, hold: 1000 });
+    }
+
     if (wave.boss) {
       this.time.delayedCall(1500, () => this.spawnBoss());
+      return;
+    }
+
+    if (wave.miniBoss) {
+      this.time.delayedCall(1000, () => this.spawnMiniBoss());
       return;
     }
 
@@ -587,6 +760,55 @@ class GameScene extends Phaser.Scene {
         targets: e, x: e.x + Phaser.Math.Between(-60, 60),
         duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
       });
+    }
+  }
+
+  spawnMiniBoss() {
+    this.bossAlive = true;
+    const mb = this.enemies.create(W/2, -60, 'miniboss');
+    mb.setDepth(8);
+    mb.setData('type', 'miniboss');
+    mb.setData('hp', 20);
+    mb.setData('score', 2000);
+    mb.setData('canShoot', false);
+    mb.setData('spiralAngle', 0);
+    this.tweens.add({ targets: mb, y: 140, duration: 1500, ease: 'Sine.easeOut' });
+    if (mb.preFX) mb.preFX.addGlow(0xffaa00, 3, 0, false, 0.06, 16);
+
+    // Mini-boss HP bar
+    this.miniBossBar = this.add.graphics().setDepth(20);
+    this.miniBossRef = mb;
+    this.miniBossMaxHP = 20;
+  }
+
+  updateMiniBoss(mb, time) {
+    if (!mb.active) return;
+    mb.x = W/2 + Math.sin(time * 0.0015) * 120;
+
+    // Spiral bullet pattern
+    if (time > (mb.getData('lastShot') || 0) + 200) {
+      mb.setData('lastShot', time);
+      let angle = mb.getData('spiralAngle');
+      for (let i = 0; i < 2; i++) {
+        const b = this.enemyBullets.create(mb.x, mb.y + 20, 'bullet_boss');
+        if (b) {
+          const rad = Phaser.Math.DegToRad(angle + i * 180);
+          b.setVelocity(Math.cos(rad) * 130, Math.sin(rad) * 130);
+          b.setDepth(5);
+        }
+      }
+      mb.setData('spiralAngle', angle + 15);
+    }
+
+    // HP bar
+    if (this.miniBossBar) {
+      this.miniBossBar.clear();
+      const hp = mb.getData('hp');
+      const pct = hp / this.miniBossMaxHP;
+      this.miniBossBar.fillStyle(0x222222, 0.8);
+      this.miniBossBar.fillRect(80, 60, W - 160, 6);
+      this.miniBossBar.fillStyle(0xffaa00, 1);
+      this.miniBossBar.fillRect(80, 60, (W - 160) * pct, 6);
     }
   }
 
@@ -700,7 +922,14 @@ class GameScene extends Phaser.Scene {
       const intensity = enemy.getData('type') === 'boss' ? 0.012 : 0.004;
       this.cameras.main.shake(100, intensity);
 
-      // Boss phase transitions
+      // Mini-boss death
+      if (enemy.getData('type') === 'miniboss') {
+        this.bossAlive = false;
+        if (this.miniBossBar) { this.miniBossBar.destroy(); this.miniBossBar = null; }
+        this.miniBossRef = null;
+      }
+
+      // Boss death
       if (enemy.getData('type') === 'boss') {
         this.bossAlive = false;
         if (this.bossBar) { this.bossBar.destroy(); this.bossBar = null; }
@@ -870,6 +1099,7 @@ class GameScene extends Phaser.Scene {
 
   showVictory() {
     this.gameOver = true;
+    StrikerMusic.stop();
     const t1 = this.add.text(W/2, H/2 - 60, 'VICTORY', {
       fontFamily: 'system-ui', fontSize: '48px', fontStyle: 'bold', color: '#ffdd00',
     }).setOrigin(0.5).setDepth(30);
@@ -893,6 +1123,7 @@ class GameScene extends Phaser.Scene {
 
   doGameOver() {
     this.gameOver = true;
+    StrikerMusic.stop();
     this.player.setVisible(false);
     this.thrustEmitter.stop();
 
